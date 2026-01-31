@@ -17,7 +17,10 @@ const app = {
         paymentTerms: '',
         scopeOfWork: '',
         disclaimers: '',
-        mode: 'owner' // 'owner' or 'contractor'
+        sectionScopes: {}, // { 'category': 'scope text' }
+        sectionDisclaimers: {}, // { 'category': 'disclaimer text' }
+        mode: 'owner', // 'owner' or 'contractor'
+        contractorSection: null // which section the contractor can edit
     },
 
     init() {
@@ -27,10 +30,11 @@ const app = {
         // Load from URL or localStorage
         this.loadFromURL() || this.loadFromStorage();
         
-        // Check URL for mode parameter AFTER loading data (so it overrides stored mode)
+        // Check URL for mode and section parameters AFTER loading data
         const params = new URLSearchParams(window.location.search);
         if (params.get('mode') === 'contractor') {
             this.data.mode = 'contractor';
+            this.data.contractorSection = params.get('section');
         }
         
         // Apply contractor mode restrictions
@@ -310,12 +314,24 @@ const app = {
         
         // Render each category as a section
         Object.keys(categories).forEach(category => {
+            // In contractor mode, only show their assigned section
+            if (this.data.mode === 'contractor' && this.data.contractorSection !== category) {
+                return;
+            }
+            
             const section = document.createElement('div');
             section.className = 'category-section';
             
             const header = document.createElement('div');
             header.className = 'category-header';
-            header.textContent = category;
+            header.innerHTML = `
+                <span>${category}</span>
+                <div class="category-header-buttons">
+                    ${this.data.mode !== 'contractor' ? `<button class="btn-header" onclick="app.sendSectionToContractor('${category}')">📤 Send to Contractor</button>` : ''}
+                    <button class="btn-header" onclick="app.editSectionScope('${category}')">📋 Scope of Work</button>
+                    <button class="btn-header" onclick="app.editSectionDisclaimers('${category}')">⚠️ Disclaimers</button>
+                </div>
+            `;
             section.appendChild(header);
             
             const tableContainer = document.createElement('div');
@@ -342,10 +358,11 @@ const app = {
                 const total = (item.qty || 0) * (item.price || 0);
                 const escapedDesc = (item.description || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
                 
-                // In contractor mode, make description and qty read-only
-                const descReadonly = this.data.mode === 'contractor' ? 'readonly style="background: #e9ecef; cursor: not-allowed;"' : '';
-                const qtyReadonly = this.data.mode === 'contractor' ? 'readonly style="background: #e9ecef; cursor: not-allowed;"' : '';
-                const removeBtn = this.data.mode === 'contractor' ? '' : `<button class="btn-remove" onclick="app.removeItem(${index})">×</button>`;
+                // In contractor mode for a specific section, only price is editable
+                const isContractorSection = this.data.mode === 'contractor' && this.data.contractorSection === category;
+                const descReadonly = (this.data.mode === 'contractor' || isContractorSection) ? 'readonly style="background: #e9ecef; cursor: not-allowed;"' : '';
+                const qtyReadonly = (this.data.mode === 'contractor' || isContractorSection) ? 'readonly style="background: #e9ecef; cursor: not-allowed;"' : '';
+                const removeBtn = this.data.mode !== 'contractor' ? `<button class="btn-remove" onclick="app.removeItem(${index})">×</button>` : '';
                 
                 row.innerHTML = `
                     <td><input type="text" value="${escapedDesc}" onchange="app.updateItem(${index}, 'description', this.value)" ${descReadonly}></td>
@@ -360,8 +377,8 @@ const app = {
             tableContainer.appendChild(table);
             section.appendChild(tableContainer);
             
-            // Add button for this category (only in owner mode)
-            if (this.data.mode !== 'contractor') {
+            // Add button for this category (only in owner mode or contractor's own section)
+            if (this.data.mode !== 'contractor' || this.data.contractorSection === category) {
                 const addBtn = document.createElement('button');
                 addBtn.className = 'btn-add-section';
                 addBtn.textContent = `+ Add Item to ${category}`;
@@ -371,6 +388,16 @@ const app = {
             
             container.appendChild(section);
         });
+        
+        // Add "New Section" button (owner mode only)
+        if (this.data.mode !== 'contractor') {
+            const newSectionBtn = document.createElement('button');
+            newSectionBtn.className = 'btn-add-section';
+            newSectionBtn.textContent = '+ Add New Section';
+            newSectionBtn.style.marginTop = '20px';
+            newSectionBtn.onclick = () => this.addNewSection();
+            container.appendChild(newSectionBtn);
+        }
     },
     
     addItemToCategory(category) {
@@ -571,6 +598,98 @@ const app = {
         }).catch(() => {
             prompt('Copy this URL and send to project owner:', url);
         });
+    },
+    
+    addNewSection() {
+        const sectionName = prompt('Enter new section name:');
+        if (sectionName && sectionName.trim()) {
+            this.data.items.push({
+                category: sectionName.trim(),
+                description: '',
+                qty: 1,
+                price: 0
+            });
+            this.renderItems();
+            this.save();
+        }
+    },
+    
+    sendSectionToContractor(category) {
+        this.save();
+        const encoded = btoa(JSON.stringify(this.data));
+        const url = `${window.location.origin}${window.location.pathname}?data=${encoded}&mode=contractor&section=${encodeURIComponent(category)}`;
+        
+        navigator.clipboard.writeText(url).then(() => {
+            this.showNotification(`✓ Link for "${category}" copied! Send this to your contractor.`, 5000);
+        }).catch(() => {
+            prompt('Copy this contractor URL:', url);
+        });
+    },
+    
+    editSectionScope(category) {
+        const currentScope = this.data.sectionScopes[category] || '';
+        const readonly = this.data.mode === 'contractor' && this.data.contractorSection !== category;
+        
+        // Create modal
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.innerHTML = `
+            <div class="modal-content">
+                <h3>Scope of Work - ${category}</h3>
+                <textarea id="sectionScopeText" rows="10" style="width: 100%; padding: 10px; font-size: 14px;" ${readonly ? 'readonly' : ''}>${currentScope}</textarea>
+                <div style="margin-top: 15px; text-align: right;">
+                    ${!readonly ? '<button class="btn" onclick="app.saveSectionScope(\'' + category + '\')">Save</button>' : ''}
+                    <button class="btn" onclick="app.closeModal()">Close</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        setTimeout(() => modal.classList.add('show'), 10);
+    },
+    
+    editSectionDisclaimers(category) {
+        const currentDisclaimers = this.data.sectionDisclaimers[category] || '';
+        const readonly = this.data.mode === 'contractor' && this.data.contractorSection !== category;
+        
+        // Create modal
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.innerHTML = `
+            <div class="modal-content">
+                <h3>Disclaimers - ${category}</h3>
+                <textarea id="sectionDisclaimersText" rows="10" style="width: 100%; padding: 10px; font-size: 14px;" ${readonly ? 'readonly' : ''}>${currentDisclaimers}</textarea>
+                <div style="margin-top: 15px; text-align: right;">
+                    ${!readonly ? '<button class="btn" onclick="app.saveSectionDisclaimers(\'' + category + '\')">Save</button>' : ''}
+                    <button class="btn" onclick="app.closeModal()">Close</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        setTimeout(() => modal.classList.add('show'), 10);
+    },
+    
+    saveSectionScope(category) {
+        const text = document.getElementById('sectionScopeText').value;
+        this.data.sectionScopes[category] = text;
+        this.save();
+        this.closeModal();
+        this.showNotification('✓ Scope of work saved!');
+    },
+    
+    saveSectionDisclaimers(category) {
+        const text = document.getElementById('sectionDisclaimersText').value;
+        this.data.sectionDisclaimers[category] = text;
+        this.save();
+        this.closeModal();
+        this.showNotification('✓ Disclaimers saved!');
+    },
+    
+    closeModal() {
+        const modal = document.querySelector('.modal');
+        if (modal) {
+            modal.classList.remove('show');
+            setTimeout(() => modal.remove(), 300);
+        }
     },
 
     generatePDF() {
