@@ -179,8 +179,11 @@ const app = {
             const row = document.createElement('tr');
             const total = (item.qty || 0) * (item.price || 0);
             
+            // Escape quotes in description to prevent HTML breaking
+            const escapedDesc = (item.description || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+            
             row.innerHTML = `
-                <td><input type="text" value="${item.description || ''}" onchange="app.updateItem(${index}, 'description', this.value)"></td>
+                <td><input type="text" value="${escapedDesc}" onchange="app.updateItem(${index}, 'description', this.value)"></td>
                 <td><input type="number" value="${item.qty || 0}" step="1" min="0" onchange="app.updateItem(${index}, 'qty', this.value)"></td>
                 <td><input type="number" value="${item.price || 0}" step="0.01" min="0" onchange="app.updateItem(${index}, 'price', this.value)"></td>
                 <td><input type="text" value="$${total.toFixed(2)}" readonly></td>
