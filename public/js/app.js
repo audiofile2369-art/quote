@@ -15,15 +15,25 @@ const app = {
         taxRate: 8.25,
         discount: 0,
         paymentTerms: '',
-        scopeOfWork: ''
+        scopeOfWork: '',
+        mode: 'owner' // 'owner' or 'contractor'
     },
 
     init() {
+        // Check URL for mode parameter
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('mode') === 'contractor') {
+            this.data.mode = 'contractor';
+        }
+        
         // Set today's date
         document.getElementById('quoteDate').value = new Date().toISOString().split('T')[0];
         
         // Load from URL or localStorage
         this.loadFromURL() || this.loadFromStorage();
+        
+        // Apply contractor mode restrictions
+        this.applyModeRestrictions();
         
         // Render initial items and files
         this.renderItems();
@@ -33,6 +43,50 @@ const app = {
         // If no items, add defaults
         if (this.data.items.length === 0) {
             this.loadDefaultItems();
+        }
+    },
+    
+    applyModeRestrictions() {
+        if (this.data.mode === 'contractor') {
+            // Show contractor banner
+            const banner = document.createElement('div');
+            banner.className = 'info-banner';
+            banner.style.cssText = 'background: #fff3cd; border-left-color: #ffc107; margin: 20px; font-size: 16px;';
+            banner.innerHTML = `
+                <strong>👷 Contractor Mode:</strong> You can view project info, fill in your pricing, and upload additional documents. 
+                When done, click "Send Back to Owner" button below.
+            `;
+            document.querySelector('.container').insertBefore(banner, document.querySelector('.actions'));
+            
+            // Make project info fields read-only
+            const readOnlyFields = ['clientName', 'siteAddress', 'quoteDate', 'quoteNumber', 
+                                   'companyName', 'contactName', 'phone', 'email', 'projectNotes',
+                                   'paymentTerms', 'scopeOfWork', 'taxRate', 'discount'];
+            readOnlyFields.forEach(id => {
+                const field = document.getElementById(id);
+                if (field) {
+                    field.readOnly = true;
+                    field.style.background = '#e9ecef';
+                    field.style.cursor = 'not-allowed';
+                }
+            });
+            
+            // Hide owner-only buttons
+            document.querySelector('.actions').innerHTML = `
+                <button onclick="app.importJSON()" class="btn btn-primary">📥 Import JSON</button>
+                <button onclick="app.exportJSON()" class="btn btn-success">💾 Save My Progress</button>
+                <button onclick="app.sendBackToOwner()" class="btn btn-danger">✅ Send Back to Owner</button>
+            `;
+            
+            // Disable add/remove buttons on categories (contractor can only edit prices)
+            document.addEventListener('click', (e) => {
+                if (e.target.classList.contains('btn-remove') || 
+                    e.target.classList.contains('btn-add-section')) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.showNotification('You cannot add/remove items in contractor mode');
+                }
+            }, true);
         }
     },
 
@@ -275,12 +329,17 @@ const app = {
                 const total = (item.qty || 0) * (item.price || 0);
                 const escapedDesc = (item.description || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
                 
+                // In contractor mode, make description and qty read-only
+                const descReadonly = this.data.mode === 'contractor' ? 'readonly style="background: #e9ecef; cursor: not-allowed;"' : '';
+                const qtyReadonly = this.data.mode === 'contractor' ? 'readonly style="background: #e9ecef; cursor: not-allowed;"' : '';
+                const removeBtn = this.data.mode === 'contractor' ? '' : `<button class="btn-remove" onclick="app.removeItem(${index})">×</button>`;
+                
                 row.innerHTML = `
-                    <td><input type="text" value="${escapedDesc}" onchange="app.updateItem(${index}, 'description', this.value)"></td>
-                    <td><input type="number" value="${item.qty || 0}" step="1" min="0" onchange="app.updateItem(${index}, 'qty', this.value)"></td>
+                    <td><input type="text" value="${escapedDesc}" onchange="app.updateItem(${index}, 'description', this.value)" ${descReadonly}></td>
+                    <td><input type="number" value="${item.qty || 0}" step="1" min="0" onchange="app.updateItem(${index}, 'qty', this.value)" ${qtyReadonly}></td>
                     <td><input type="number" value="${item.price || 0}" step="0.01" min="0" onchange="app.updateItem(${index}, 'price', this.value)"></td>
                     <td><input type="text" value="$${total.toFixed(2)}" readonly></td>
-                    <td><button class="btn-remove" onclick="app.removeItem(${index})">×</button></td>
+                    <td>${removeBtn}</td>
                 `;
                 tbody.appendChild(row);
             });
@@ -288,12 +347,14 @@ const app = {
             tableContainer.appendChild(table);
             section.appendChild(tableContainer);
             
-            // Add button for this category
-            const addBtn = document.createElement('button');
-            addBtn.className = 'btn-add-section';
-            addBtn.textContent = `+ Add Item to ${category}`;
-            addBtn.onclick = () => this.addItemToCategory(category);
-            section.appendChild(addBtn);
+            // Add button for this category (only in owner mode)
+            if (this.data.mode !== 'contractor') {
+                const addBtn = document.createElement('button');
+                addBtn.className = 'btn-add-section';
+                addBtn.textContent = `+ Add Item to ${category}`;
+                addBtn.onclick = () => this.addItemToCategory(category);
+                section.appendChild(addBtn);
+            }
             
             container.appendChild(section);
         });
@@ -457,6 +518,7 @@ const app = {
 
     shareURL() {
         this.save();
+        this.data.mode = 'owner'; // Always share as owner
         const encoded = btoa(JSON.stringify(this.data));
         const url = `${window.location.origin}${window.location.pathname}?data=${encoded}`;
         
@@ -466,6 +528,33 @@ const app = {
         }).catch(() => {
             // Fallback
             prompt('Copy this URL:', url);
+        });
+    },
+    
+    sendToContractor() {
+        this.save();
+        const encoded = btoa(JSON.stringify(this.data));
+        const url = `${window.location.origin}${window.location.pathname}?data=${encoded}&mode=contractor`;
+        
+        // Copy to clipboard
+        navigator.clipboard.writeText(url).then(() => {
+            this.showNotification('✓ Contractor link copied! Send this to your contractor.', 5000);
+        }).catch(() => {
+            prompt('Copy this contractor URL:', url);
+        });
+    },
+    
+    sendBackToOwner() {
+        this.save();
+        this.data.mode = 'owner'; // Send back as owner mode
+        const encoded = btoa(JSON.stringify(this.data));
+        const url = `${window.location.origin}${window.location.pathname}?data=${encoded}`;
+        
+        // Copy to clipboard
+        navigator.clipboard.writeText(url).then(() => {
+            this.showNotification('✓ Link copied! Send this back to the project owner.', 5000);
+        }).catch(() => {
+            prompt('Copy this URL and send to project owner:', url);
         });
     },
 
