@@ -10,6 +10,8 @@ const app = {
         phone: '817-888-6167',
         email: 'tlyons@petronetwrksolutions.com',
         items: [],
+        files: [],
+        projectNotes: '',
         taxRate: 8.25,
         discount: 0,
         paymentTerms: '',
@@ -23,11 +25,12 @@ const app = {
         // Load from URL or localStorage
         this.loadFromURL() || this.loadFromStorage();
         
-        // Render initial items
+        // Render initial items and files
         this.renderItems();
+        this.renderFiles();
         this.calculateTotals();
         
-        // If no items, add a few defaults
+        // If no items, add defaults
         if (this.data.items.length === 0) {
             this.loadDefaultItems();
         }
@@ -139,6 +142,74 @@ const app = {
         this.renderItems();
         this.save();
     },
+    
+    handleFileUpload(event) {
+        const files = event.target.files;
+        
+        Array.from(files).forEach(file => {
+            // Check file size (5MB limit)
+            if (file.size > 5 * 1024 * 1024) {
+                alert(`File ${file.name} is too large. Max size is 5MB.`);
+                return;
+            }
+            
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                this.data.files.push({
+                    name: file.name,
+                    type: file.type,
+                    size: file.size,
+                    data: e.target.result
+                });
+                this.renderFiles();
+                this.save();
+            };
+            reader.readAsDataURL(file);
+        });
+        
+        // Clear the input
+        event.target.value = '';
+    },
+    
+    renderFiles() {
+        const filesList = document.getElementById('filesList');
+        if (!filesList) return;
+        
+        if (this.data.files.length === 0) {
+            filesList.innerHTML = '<p style="color: #999; font-style: italic;">No files uploaded yet</p>';
+            return;
+        }
+        
+        filesList.innerHTML = '';
+        this.data.files.forEach((file, index) => {
+            const fileItem = document.createElement('div');
+            fileItem.className = 'file-item';
+            
+            const icon = file.type.includes('pdf') ? '📄' : 
+                        file.type.includes('image') ? '🖼️' : '📎';
+            
+            const sizeKB = (file.size / 1024).toFixed(1);
+            
+            fileItem.innerHTML = `
+                <div class="file-info">
+                    <span class="file-icon">${icon}</span>
+                    <div>
+                        <div class="file-name">${file.name}</div>
+                        <div class="file-size">${sizeKB} KB</div>
+                    </div>
+                </div>
+                <button class="btn-remove-file" onclick="app.removeFile(${index})">Remove</button>
+            `;
+            
+            filesList.appendChild(fileItem);
+        });
+    },
+    
+    removeFile(index) {
+        this.data.files.splice(index, 1);
+        this.renderFiles();
+        this.save();
+    },
 
     removeItem(index) {
         this.data.items.splice(index, 1);
@@ -157,41 +228,86 @@ const app = {
     },
 
     renderItems() {
-        const tbody = document.getElementById('itemsBody');
-        tbody.innerHTML = '';
+        const container = document.getElementById('categorySections');
+        if (!container) return;
+        
+        container.innerHTML = '';
         
         // Group items by category
-        let currentCategory = '';
-        
+        const categories = {};
         this.data.items.forEach((item, index) => {
-            // Add category header if new category
-            if (item.category && item.category !== currentCategory) {
-                currentCategory = item.category;
-                const headerRow = document.createElement('tr');
-                headerRow.innerHTML = `
-                    <td colspan="5" style="background: #f8f9fa; font-weight: bold; color: #c41e3a; padding: 12px; border-top: 2px solid #c41e3a;">
-                        ${currentCategory}
-                    </td>
-                `;
-                tbody.appendChild(headerRow);
-            }
+            const cat = item.category || 'Uncategorized';
+            if (!categories[cat]) categories[cat] = [];
+            categories[cat].push({ item, index });
+        });
+        
+        // Render each category as a section
+        Object.keys(categories).forEach(category => {
+            const section = document.createElement('div');
+            section.className = 'category-section';
             
-            const row = document.createElement('tr');
-            const total = (item.qty || 0) * (item.price || 0);
+            const header = document.createElement('div');
+            header.className = 'category-header';
+            header.textContent = category;
+            section.appendChild(header);
             
-            // Escape quotes in description to prevent HTML breaking
-            const escapedDesc = (item.description || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+            const tableContainer = document.createElement('div');
+            tableContainer.className = 'category-table';
             
-            row.innerHTML = `
-                <td><input type="text" value="${escapedDesc}" onchange="app.updateItem(${index}, 'description', this.value)"></td>
-                <td><input type="number" value="${item.qty || 0}" step="1" min="0" onchange="app.updateItem(${index}, 'qty', this.value)"></td>
-                <td><input type="number" value="${item.price || 0}" step="0.01" min="0" onchange="app.updateItem(${index}, 'price', this.value)"></td>
-                <td><input type="text" value="$${total.toFixed(2)}" readonly></td>
-                <td><button class="btn-remove" onclick="app.removeItem(${index})">×</button></td>
+            const table = document.createElement('table');
+            table.innerHTML = `
+                <thead>
+                    <tr>
+                        <th style="width: 40%;">Description</th>
+                        <th style="width: 100px;">QTY</th>
+                        <th style="width: 120px;">Unit Price</th>
+                        <th style="width: 120px;">Total</th>
+                        <th style="width: 60px;"></th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
             `;
             
-            tbody.appendChild(row);
+            const tbody = table.querySelector('tbody');
+            
+            categories[category].forEach(({ item, index }) => {
+                const row = document.createElement('tr');
+                const total = (item.qty || 0) * (item.price || 0);
+                const escapedDesc = (item.description || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+                
+                row.innerHTML = `
+                    <td><input type="text" value="${escapedDesc}" onchange="app.updateItem(${index}, 'description', this.value)"></td>
+                    <td><input type="number" value="${item.qty || 0}" step="1" min="0" onchange="app.updateItem(${index}, 'qty', this.value)"></td>
+                    <td><input type="number" value="${item.price || 0}" step="0.01" min="0" onchange="app.updateItem(${index}, 'price', this.value)"></td>
+                    <td><input type="text" value="$${total.toFixed(2)}" readonly></td>
+                    <td><button class="btn-remove" onclick="app.removeItem(${index})">×</button></td>
+                `;
+                tbody.appendChild(row);
+            });
+            
+            tableContainer.appendChild(table);
+            section.appendChild(tableContainer);
+            
+            // Add button for this category
+            const addBtn = document.createElement('button');
+            addBtn.className = 'btn-add-section';
+            addBtn.textContent = `+ Add Item to ${category}`;
+            addBtn.onclick = () => this.addItemToCategory(category);
+            section.appendChild(addBtn);
+            
+            container.appendChild(section);
         });
+    },
+    
+    addItemToCategory(category) {
+        this.data.items.push({
+            category: category,
+            description: '',
+            qty: 1,
+            price: 0
+        });
+        this.renderItems();
+        this.save();
     },
 
     calculateTotals() {
@@ -223,6 +339,7 @@ const app = {
         this.data.contactName = document.getElementById('contactName')?.value || '';
         this.data.phone = document.getElementById('phone')?.value || '';
         this.data.email = document.getElementById('email')?.value || '';
+        this.data.projectNotes = document.getElementById('projectNotes')?.value || '';
         this.data.paymentTerms = document.getElementById('paymentTerms')?.value || '';
         this.data.scopeOfWork = document.getElementById('scopeOfWork')?.value || '';
         
@@ -273,6 +390,7 @@ const app = {
         document.getElementById('email').value = this.data.email || '';
         document.getElementById('taxRate').value = this.data.taxRate || 8.25;
         document.getElementById('discount').value = this.data.discount || 0;
+        document.getElementById('projectNotes').value = this.data.projectNotes || '';
         document.getElementById('paymentTerms').value = this.data.paymentTerms || '';
         document.getElementById('scopeOfWork').value = this.data.scopeOfWork || '';
     },

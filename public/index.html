@@ -23,7 +23,8 @@
         </div>
 
         <div class="tabs">
-            <button class="tab active" onclick="app.switchTab('info')">Info</button>
+            <button class="tab active" onclick="app.switchTab('info')">Project Info</button>
+            <button class="tab" onclick="app.switchTab('plans')">Site Plans & Files</button>
             <button class="tab" onclick="app.switchTab('items')">Line Items</button>
             <button class="tab" onclick="app.switchTab('summary')">Summary</button>
         </div>
@@ -72,8 +73,44 @@
             </div>
         </div>
 
+        <!-- TAB: Site Plans & Files -->
+        <div id="tab-plans" class="tab-content">
+            <h2>Site Plans & Files</h2>
+            
+            <div class="info-banner" style="background: #d1ecf1; border-left-color: #17a2b8;">
+                <strong>📎 Upload Files:</strong> Attach site plans, blueprints, photos, or any documents. Files are embedded in the shareable link and JSON export.
+            </div>
+
+            <div class="form-group">
+                <label>Upload Files (PDFs, Images, Documents)</label>
+                <input type="file" id="fileUpload" multiple accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx" onchange="app.handleFileUpload(event)">
+                <small style="color: #666; margin-top: 5px; display: block;">Max 5MB per file. Files will be embedded as base64.</small>
+            </div>
+
+            <h3>Uploaded Files</h3>
+            <div id="filesList" class="files-list">
+                <p style="color: #999; font-style: italic;">No files uploaded yet</p>
+            </div>
+
+            <h3>Notes / Special Instructions</h3>
+            <div class="form-group">
+                <textarea id="projectNotes" rows="8" onchange="app.save()" placeholder="Add any special instructions, site conditions, requirements, etc."></textarea>
+            </div>
+        </div>
+
         <!-- TAB: Line Items -->
         <div id="tab-items" class="tab-content">
+            <h2>Line Items</h2>
+            
+            <div class="info-banner">
+                <strong>💡 Tip:</strong> Export JSON to send to contractors for pricing, then import their updates to merge data.
+            </div>
+
+            <div id="categorySections"></div>
+        </div>
+
+        <!-- TAB: Line Items (OLD - REMOVE THIS) -->
+        <div id="tab-items-old" class="tab-content" style="display: none;">
             <h2>Line Items</h2>
             
             <div class="info-banner">
