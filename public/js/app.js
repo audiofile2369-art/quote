@@ -35,6 +35,14 @@ const app = {
         if (params.get('mode') === 'contractor') {
             this.data.mode = 'contractor';
             this.data.contractorSection = params.get('section');
+            
+            // Check for multiple sections (comma-separated)
+            const sectionsParam = params.get('sections');
+            if (sectionsParam) {
+                this.data.contractorSections = sectionsParam.split(',').map(s => decodeURIComponent(s));
+            } else if (this.data.contractorSection) {
+                this.data.contractorSections = [this.data.contractorSection];
+            }
         }
         
         // Apply contractor mode restrictions
@@ -314,8 +322,10 @@ const app = {
         
         // Render each category as a section
         Object.keys(categories).forEach(category => {
-            // In contractor mode, only show their assigned section
-            if (this.data.mode === 'contractor' && this.data.contractorSection !== category) {
+            // In contractor mode, only show their assigned sections
+            if (this.data.mode === 'contractor' && 
+                this.data.contractorSections.length > 0 && 
+                !this.data.contractorSections.includes(category)) {
                 return;
             }
             
@@ -325,7 +335,10 @@ const app = {
             const header = document.createElement('div');
             header.className = 'category-header';
             header.innerHTML = `
-                <span>${category}</span>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    ${this.data.mode !== 'contractor' ? `<input type="checkbox" class="section-checkbox" data-category="${category}" style="width: 18px; height: 18px; cursor: pointer;">` : ''}
+                    <span>${category}</span>
+                </div>
                 <div class="category-header-buttons">
                     ${this.data.mode !== 'contractor' ? `<button class="btn-header" onclick="app.sendSectionToContractor('${category}')">📤 Send to Contractor</button>` : ''}
                     <button class="btn-header" onclick="app.editSectionScope('${category}')">📋 Scope of Work</button>
@@ -359,8 +372,8 @@ const app = {
                 const total = (item.qty || 0) * (item.price || 0);
                 const escapedDesc = (item.description || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
                 
-                // In contractor mode for a specific section, only price is editable
-                const isContractorSection = this.data.mode === 'contractor' && this.data.contractorSection === category;
+                // In contractor mode for assigned sections, only price is editable
+                const isContractorSection = this.data.mode === 'contractor' && this.data.contractorSections.includes(category);
                 const descReadonly = (this.data.mode === 'contractor' || isContractorSection) ? 'readonly style="background: #e9ecef; cursor: not-allowed;"' : '';
                 const qtyReadonly = (this.data.mode === 'contractor' || isContractorSection) ? 'readonly style="background: #e9ecef; cursor: not-allowed;"' : '';
                 const removeBtn = this.data.mode !== 'contractor' ? `<button class="btn-remove" onclick="app.removeItem(${index})">×</button>` : '';
@@ -378,8 +391,8 @@ const app = {
             tableContainer.appendChild(table);
             section.appendChild(tableContainer);
             
-            // Add button for this category (only in owner mode or contractor's own section)
-            if (this.data.mode !== 'contractor' || this.data.contractorSection === category) {
+            // Add button for this category (only in owner mode or contractor's own sections)
+            if (this.data.mode !== 'contractor' || this.data.contractorSections.includes(category)) {
                 const addBtn = document.createElement('button');
                 addBtn.className = 'btn-add-section';
                 addBtn.textContent = `+ Add Item to ${category}`;
@@ -390,14 +403,27 @@ const app = {
             container.appendChild(section);
         });
         
-        // Add "New Section" button (owner mode only)
+        // Add "Send Selected to Contractor" and "New Section" buttons (owner mode only)
         if (this.data.mode !== 'contractor') {
+            const buttonContainer = document.createElement('div');
+            buttonContainer.style.marginTop = '20px';
+            buttonContainer.style.display = 'flex';
+            buttonContainer.style.gap = '10px';
+            
+            const sendSelectedBtn = document.createElement('button');
+            sendSelectedBtn.className = 'btn-add-section';
+            sendSelectedBtn.style.background = '#007bff';
+            sendSelectedBtn.textContent = '📤 Send Selected Sections to Contractor';
+            sendSelectedBtn.onclick = () => this.sendSelectedSectionsToContractor();
+            buttonContainer.appendChild(sendSelectedBtn);
+            
             const newSectionBtn = document.createElement('button');
             newSectionBtn.className = 'btn-add-section';
             newSectionBtn.textContent = '+ Add New Section';
-            newSectionBtn.style.marginTop = '20px';
             newSectionBtn.onclick = () => this.addNewSection();
-            container.appendChild(newSectionBtn);
+            buttonContainer.appendChild(newSectionBtn);
+            
+            container.appendChild(buttonContainer);
         }
     },
     
@@ -627,9 +653,32 @@ const app = {
         });
     },
     
+    sendSelectedSectionsToContractor() {
+        const checkboxes = document.querySelectorAll('.section-checkbox:checked');
+        const selectedCategories = Array.from(checkboxes).map(cb => cb.dataset.category);
+        
+        if (selectedCategories.length === 0) {
+            alert('Please select at least one section to send to contractor');
+            return;
+        }
+        
+        this.save();
+        const encoded = btoa(JSON.stringify(this.data));
+        const sectionsParam = selectedCategories.map(s => encodeURIComponent(s)).join(',');
+        const url = `${window.location.origin}${window.location.pathname}?data=${encoded}&mode=contractor&sections=${sectionsParam}`;
+        
+        navigator.clipboard.writeText(url).then(() => {
+            this.showNotification(`✓ Link for ${selectedCategories.length} section(s) copied! Send this to your contractor.`, 5000);
+            // Uncheck all boxes
+            checkboxes.forEach(cb => cb.checked = false);
+        }).catch(() => {
+            prompt('Copy this contractor URL:', url);
+        });
+    },
+    
     editSectionScope(category) {
         const currentScope = this.data.sectionScopes[category] || '';
-        const readonly = this.data.mode === 'contractor' && this.data.contractorSection !== category;
+        const readonly = this.data.mode === 'contractor' && !this.data.contractorSections.includes(category);
         
         // Create modal
         const modal = document.createElement('div');
@@ -650,7 +699,7 @@ const app = {
     
     editSectionDisclaimers(category) {
         const currentDisclaimers = this.data.sectionDisclaimers[category] || '';
-        const readonly = this.data.mode === 'contractor' && this.data.contractorSection !== category;
+        const readonly = this.data.mode === 'contractor' && !this.data.contractorSections.includes(category);
         
         // Create modal
         const modal = document.createElement('div');
