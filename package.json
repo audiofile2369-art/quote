@@ -1,0 +1,12 @@
+{
+  "name": "estimator",
+  "version": "1.0.0",
+  "description": "Simple estimator/quote builder for petroleum equipment",
+  "scripts": {
+    "dev": "npx serve public",
+    "build": "echo 'No build needed - static site'"
+  },
+  "keywords": ["estimator", "quote", "bid"],
+  "author": "",
+  "license": "ISC"
+}
