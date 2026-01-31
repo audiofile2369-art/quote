@@ -16,6 +16,7 @@ const app = {
         discount: 0,
         paymentTerms: '',
         scopeOfWork: '',
+        disclaimers: '',
         mode: 'owner' // 'owner' or 'contractor'
     },
 
@@ -61,7 +62,7 @@ const app = {
             // Make project info fields read-only
             const readOnlyFields = ['clientName', 'siteAddress', 'quoteDate', 'quoteNumber', 
                                    'companyName', 'contactName', 'phone', 'email', 'projectNotes',
-                                   'paymentTerms', 'scopeOfWork', 'taxRate', 'discount'];
+                                   'paymentTerms', 'scopeOfWork', 'disclaimers', 'taxRate', 'discount'];
             readOnlyFields.forEach(id => {
                 const field = document.getElementById(id);
                 if (field) {
@@ -71,10 +72,9 @@ const app = {
                 }
             });
             
-            // Hide owner-only buttons and show contractor buttons
+            // Hide owner-only buttons and show contractor buttons ONLY
             document.querySelector('.actions').innerHTML = `
-                <button onclick="app.exportJSON()" class="btn btn-success">💾 Save My Work (JSON)</button>
-                <button onclick="app.sendBackToOwner()" class="btn btn-danger" style="font-size: 16px; padding: 15px 30px;">
+                <button onclick="app.sendBackToOwner()" class="btn btn-danger" style="font-size: 18px; padding: 18px 40px;">
                     ✅ SEND BACK TO OWNER
                 </button>
             `;
@@ -410,6 +410,7 @@ const app = {
         this.data.projectNotes = document.getElementById('projectNotes')?.value || '';
         this.data.paymentTerms = document.getElementById('paymentTerms')?.value || '';
         this.data.scopeOfWork = document.getElementById('scopeOfWork')?.value || '';
+        this.data.disclaimers = document.getElementById('disclaimers')?.value || '';
         
         // Save to localStorage
         localStorage.setItem('estimatorData', JSON.stringify(this.data));
@@ -461,6 +462,7 @@ const app = {
         document.getElementById('projectNotes').value = this.data.projectNotes || '';
         document.getElementById('paymentTerms').value = this.data.paymentTerms || '';
         document.getElementById('scopeOfWork').value = this.data.scopeOfWork || '';
+        document.getElementById('disclaimers').value = this.data.disclaimers || '';
     },
 
     exportJSON() {
@@ -470,10 +472,10 @@ const app = {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `estimate-${this.data.clientName || 'quote'}-${new Date().toISOString().split('T')[0]}.json`;
+        a.download = `job-${this.data.clientName || 'quote'}-${new Date().toISOString().split('T')[0]}.json`;
         a.click();
         URL.revokeObjectURL(url);
-        this.showNotification('✓ JSON exported!');
+        this.showNotification('✓ Job exported!');
     },
 
     importJSON() {
