@@ -71,12 +71,19 @@ const app = {
                 }
             });
             
-            // Hide owner-only buttons
+            // Hide owner-only buttons and show contractor buttons
             document.querySelector('.actions').innerHTML = `
-                <button onclick="app.importJSON()" class="btn btn-primary">📥 Import JSON</button>
-                <button onclick="app.exportJSON()" class="btn btn-success">💾 Save My Progress</button>
-                <button onclick="app.sendBackToOwner()" class="btn btn-danger">✅ Send Back to Owner</button>
+                <button onclick="app.exportJSON()" class="btn btn-success">💾 Save My Work (JSON)</button>
+                <button onclick="app.sendBackToOwner()" class="btn btn-danger" style="font-size: 16px; padding: 15px 30px;">
+                    ✅ SEND BACK TO OWNER
+                </button>
             `;
+            
+            // Show auto-save indicator
+            const autoSaveMsg = document.createElement('div');
+            autoSaveMsg.style.cssText = 'text-align: center; padding: 10px; background: #d4edda; color: #155724; font-weight: 600;';
+            autoSaveMsg.innerHTML = '💾 Your changes are auto-saved as you type';
+            document.querySelector('.actions').appendChild(autoSaveMsg);
             
             // Disable add/remove buttons on categories (contractor can only edit prices)
             document.addEventListener('click', (e) => {
