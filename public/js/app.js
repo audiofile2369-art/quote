@@ -35,12 +35,78 @@ const app = {
 
     loadDefaultItems() {
         const defaults = [
-            { description: '6" round X 7" long crash protector', qty: 12, price: 0 },
-            { description: 'Fiberglass Dispenser Sumps', qty: 3, price: 0 },
-            { description: 'Impact valve double poppet', qty: 8, price: 0 },
-            { description: 'OPW closed bottom fiberglass submerged pump sump', qty: 3, price: 0 },
-            { description: '1-1/2 HP submerged pump', qty: 3, price: 0 },
-            { description: 'TLS-450PLUS Console', qty: 1, price: 0 }
+            // A. FORECOURT ISLAND EQUIPMENT
+            { category: 'A. Forecourt Island Equipment', description: '6" round X 7" long crash protector', qty: 12, price: 0 },
+            { category: 'A. Forecourt Island Equipment', description: 'Fiberglass Dispenser Sumps', qty: 3, price: 0 },
+            { category: 'A. Forecourt Island Equipment', description: 'Island Forms 3 X 8 X9 with 6"R', qty: 3, price: 0 },
+            { category: 'A. Forecourt Island Equipment', description: 'Stabilizer bar', qty: 8, price: 0 },
+            { category: 'A. Forecourt Island Equipment', description: 'flex connector 1 1/2" X 16"', qty: 8, price: 0 },
+            { category: 'A. Forecourt Island Equipment', description: 'Impact valve double poppet', qty: 8, price: 0 },
+            
+            // B. FORECOURT SUBMERGED PUMP PACKAGE
+            { category: 'B. Forecourt Submerged Pump Package', description: 'OPW closed bottom fiberglass submerged pump sump', qty: 3, price: 0 },
+            { category: 'B. Forecourt Submerged Pump Package', description: 'Sump mounting flange', qty: 3, price: 0 },
+            { category: 'B. Forecourt Submerged Pump Package', description: '42" round manhole Matador', qty: 3, price: 0 },
+            { category: 'B. Forecourt Submerged Pump Package', description: '1 1/2 HP sub pump (Regular/Premium/Diesel)', qty: 3, price: 0 },
+            { category: 'B. Forecourt Submerged Pump Package', description: 'Gasoline DPLLD with SwiftCheck Valve', qty: 2, price: 0 },
+            { category: 'B. Forecourt Submerged Pump Package', description: 'Diesel DPLLD with SwiftCheck Valve', qty: 1, price: 0 },
+            { category: 'B. Forecourt Submerged Pump Package', description: 'Relay w/ hook box', qty: 3, price: 0 },
+            { category: 'B. Forecourt Submerged Pump Package', description: '2" ball valve', qty: 3, price: 0 },
+            { category: 'B. Forecourt Submerged Pump Package', description: '2" X 16" flex connector', qty: 3, price: 0 },
+            
+            // C. TANK EQUIPMENT
+            { category: 'C. Tank Equipment', description: 'Spill containment manhole', qty: 3, price: 0 },
+            { category: 'C. Tank Equipment', description: '10" overfill drop tube', qty: 3, price: 0 },
+            { category: 'C. Tank Equipment', description: '4" fill adaptor w/swivel', qty: 2, price: 0 },
+            { category: 'C. Tank Equipment', description: '4" adaptor standard', qty: 1, price: 0 },
+            { category: 'C. Tank Equipment', description: '4" fill cap', qty: 3, price: 0 },
+            { category: 'C. Tank Equipment', description: 'EVR vapor adaptor manhole', qty: 1, price: 0 },
+            { category: 'C. Tank Equipment', description: 'EVR vapor swivel adaptor', qty: 1, price: 0 },
+            { category: 'C. Tank Equipment', description: 'EVR adaptor cap', qty: 1, price: 0 },
+            { category: 'C. Tank Equipment', description: 'Extractor valve', qty: 3, price: 0 },
+            { category: 'C. Tank Equipment', description: 'Face seal adaptor', qty: 2, price: 0 },
+            { category: 'C. Tank Equipment', description: '2" EVR vent cap', qty: 2, price: 0 },
+            { category: 'C. Tank Equipment', description: 'Aluminum vent cap', qty: 1, price: 0 },
+            { category: 'C. Tank Equipment', description: 'Probe manhole', qty: 3, price: 0 },
+            { category: 'C. Tank Equipment', description: 'Interstitial Manhole', qty: 1, price: 0 },
+            { category: 'C. Tank Equipment', description: 'Monitor Well Manhole', qty: 2, price: 0 },
+            
+            // D. TANK MONITOR PACKAGE
+            { category: 'D. Tank Monitor Package', description: 'TLS-450PLUS Console (Dual USB, RS-232/RS-485)', qty: 1, price: 0 },
+            { category: 'D. Tank Monitor Package', description: 'TLS450PLUS Application Software', qty: 1, price: 0 },
+            { category: 'D. Tank Monitor Package', description: 'Universal Sensor/Probe Interface Module', qty: 1, price: 0 },
+            { category: 'D. Tank Monitor Package', description: 'Universal Input/Output Interface Module (UIOM)', qty: 1, price: 0 },
+            { category: 'D. Tank Monitor Package', description: 'Base Compliance DPLLD Software', qty: 1, price: 0 },
+            { category: 'D. Tank Monitor Package', description: 'SS Probe 0.2 MAG Plus Water Detection - 10 ft', qty: 3, price: 0 },
+            { category: 'D. Tank Monitor Package', description: 'Install Kit - MAG Probe (Gas Phase Separator/Water Detector)', qty: 2, price: 0 },
+            { category: 'D. Tank Monitor Package', description: 'Install Kit - MAG Plus Diesel', qty: 1, price: 0 },
+            { category: 'D. Tank Monitor Package', description: 'Sump Sensor (Piping, 12ft Cable)', qty: 6, price: 0 },
+            { category: 'D. Tank Monitor Package', description: 'Interstitial Sensor - Steel Tank (4-12ft)', qty: 1, price: 0 },
+            { category: 'D. Tank Monitor Package', description: 'TLS450+ Continuous Statistical Leak Detection (CSLD)', qty: 1, price: 0 },
+            
+            // E. TANK SPECIFICATIONS
+            { category: 'E. Tank Specifications', description: '25,000 gallon ELUTRON double wall underground tank. 10" dia. x 42.5" long. 3-compartment construction- SPLIT 5/15/5. Each compartment includes (5) 4" FNPT fittings. (1) 2" FNPT interstitial monitor port.', qty: 1, price: 0 },
+            { category: 'E. Tank Specifications', description: 'Add to above for tie-down straps', qty: 7, price: 0 },
+            { category: 'E. Tank Specifications', description: 'Add to above for turnbuckles', qty: 14, price: 0 },
+            
+            // F. DISPENSERS - WAYNE ANTHEM
+            { category: 'F. Dispensers - Wayne Anthem', description: 'DUAL Passport POS terminal (2 servers, scanners, PIN pads)', qty: 1, price: 0 },
+            { category: 'F. Dispensers - Wayne Anthem', description: 'Universal D-Box (for Wayne Anthems)', qty: 1, price: 0 },
+            { category: 'F. Dispensers - Wayne Anthem', description: 'Wayne Anthem Model B23/4 (four grade blending, diesel)', qty: 1, price: 0 },
+            { category: 'F. Dispensers - Wayne Anthem', description: 'Wayne Anthem Model B12/3 (four grade blending)', qty: 1, price: 0 },
+            { category: 'F. Dispensers - Wayne Anthem', description: 'DX Promote annual contract', qty: 1, price: 0 },
+            { category: 'F. Dispensers - Wayne Anthem', description: 'Additional warranty (years 4-5)', qty: 1, price: 0 },
+            { category: 'F. Dispensers - Wayne Anthem', description: 'Unbranded valances', qty: 1, price: 0 },
+            { category: 'F. Dispensers - Wayne Anthem', description: 'OPW Hanging Hardware (Unleaded/Premium)', qty: 1, price: 0 },
+            { category: 'F. Dispensers - Wayne Anthem', description: 'OPW Hanging Hardware (Diesel)', qty: 1, price: 0 },
+            { category: 'F. Dispensers - Wayne Anthem', description: 'POS Installation and commissioning', qty: 1, price: 0 },
+            
+            // G. DISPENSERS - GILBARCO
+            { category: 'G. Dispensers - Gilbarco', description: 'DUAL Passport POS terminal', qty: 1, price: 0 },
+            { category: 'G. Dispensers - Gilbarco', description: 'Gilbarco Encore Model E700 3+1 (four grade, diesel, Flexpay 6)', qty: 1, price: 0 },
+            { category: 'G. Dispensers - Gilbarco', description: 'Gilbarco Encore Model E700 3+0 (three grade, Flexpay 6)', qty: 1, price: 0 },
+            { category: 'G. Dispensers - Gilbarco', description: 'OPW Hanging Hardware (Unleaded/Premium)', qty: 1, price: 0 },
+            { category: 'G. Dispensers - Gilbarco', description: 'OPW Hanging Hardware (Diesel)', qty: 1, price: 0 }
         ];
         
         this.data.items = defaults;
@@ -59,7 +125,17 @@ const app = {
     },
 
     addItem() {
-        this.data.items.push({ description: '', qty: 1, price: 0 });
+        // Get the last item's category, or default to first category
+        const lastCategory = this.data.items.length > 0 ? 
+            this.data.items[this.data.items.length - 1].category : 
+            'A. Forecourt Island Equipment';
+        
+        this.data.items.push({ 
+            category: lastCategory, 
+            description: '', 
+            qty: 1, 
+            price: 0 
+        });
         this.renderItems();
         this.save();
     },
@@ -84,7 +160,22 @@ const app = {
         const tbody = document.getElementById('itemsBody');
         tbody.innerHTML = '';
         
+        // Group items by category
+        let currentCategory = '';
+        
         this.data.items.forEach((item, index) => {
+            // Add category header if new category
+            if (item.category && item.category !== currentCategory) {
+                currentCategory = item.category;
+                const headerRow = document.createElement('tr');
+                headerRow.innerHTML = `
+                    <td colspan="5" style="background: #f8f9fa; font-weight: bold; color: #c41e3a; padding: 12px; border-top: 2px solid #c41e3a;">
+                        ${currentCategory}
+                    </td>
+                `;
+                tbody.appendChild(headerRow);
+            }
+            
             const row = document.createElement('tr');
             const total = (item.qty || 0) * (item.price || 0);
             
@@ -264,7 +355,7 @@ const app = {
         const taxAmount = subtotal * (this.data.taxRate / 100);
         const grandTotal = subtotal + taxAmount - this.data.discount;
         
-        // Build line items table
+        // Build line items table with categories
         const tableBody = [
             [
                 { text: 'Description', style: 'tableHeader' },
@@ -274,7 +365,19 @@ const app = {
             ]
         ];
         
+        let currentCategory = '';
         this.data.items.forEach(item => {
+            // Add category header
+            if (item.category && item.category !== currentCategory) {
+                currentCategory = item.category;
+                tableBody.push([
+                    { text: currentCategory, colSpan: 4, bold: true, color: '#c41e3a', fillColor: '#f8f9fa', margin: [0, 5, 0, 5] },
+                    {},
+                    {},
+                    {}
+                ]);
+            }
+            
             const total = item.qty * item.price;
             tableBody.push([
                 item.description,
