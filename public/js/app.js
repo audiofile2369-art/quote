@@ -330,6 +330,7 @@ const app = {
                     ${this.data.mode !== 'contractor' ? `<button class="btn-header" onclick="app.sendSectionToContractor('${category}')">📤 Send to Contractor</button>` : ''}
                     <button class="btn-header" onclick="app.editSectionScope('${category}')">📋 Scope of Work</button>
                     <button class="btn-header" onclick="app.editSectionDisclaimers('${category}')">⚠️ Disclaimers</button>
+                    ${this.data.mode !== 'contractor' ? `<button class="btn-header btn-delete-section" onclick="app.deleteSection('${category}')">🗑️ Delete Section</button>` : ''}
                 </div>
             `;
             section.appendChild(header);
@@ -689,6 +690,22 @@ const app = {
         if (modal) {
             modal.classList.remove('show');
             setTimeout(() => modal.remove(), 300);
+        }
+    },
+    
+    deleteSection(category) {
+        if (confirm(`Are you sure you want to delete the entire "${category}" section? This will remove all items in this section.`)) {
+            // Remove all items in this category
+            this.data.items = this.data.items.filter(item => item.category !== category);
+            
+            // Remove section-specific scope and disclaimers
+            delete this.data.sectionScopes[category];
+            delete this.data.sectionDisclaimers[category];
+            
+            this.renderItems();
+            this.calculateTotals();
+            this.save();
+            this.showNotification(`✓ "${category}" section deleted`);
         }
     },
 

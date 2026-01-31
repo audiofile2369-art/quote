@@ -439,6 +439,16 @@ td input[readonly] {
     border-color: rgba(255, 255, 255, 0.5);
 }
 
+.btn-delete-section {
+    background: rgba(220, 53, 69, 0.3) !important;
+    border-color: rgba(220, 53, 69, 0.5) !important;
+}
+
+.btn-delete-section:hover {
+    background: rgba(220, 53, 69, 0.5) !important;
+    border-color: rgba(220, 53, 69, 0.7) !important;
+}
+
 .modal {
     position: fixed;
     top: 0;
