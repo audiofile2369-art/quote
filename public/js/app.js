@@ -21,17 +21,17 @@ const app = {
     },
 
     init() {
-        // Check URL for mode parameter
-        const params = new URLSearchParams(window.location.search);
-        if (params.get('mode') === 'contractor') {
-            this.data.mode = 'contractor';
-        }
-        
         // Set today's date
         document.getElementById('quoteDate').value = new Date().toISOString().split('T')[0];
         
         // Load from URL or localStorage
         this.loadFromURL() || this.loadFromStorage();
+        
+        // Check URL for mode parameter AFTER loading data (so it overrides stored mode)
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('mode') === 'contractor') {
+            this.data.mode = 'contractor';
+        }
         
         // Apply contractor mode restrictions
         this.applyModeRestrictions();
