@@ -170,7 +170,13 @@ const app = {
             { category: 'G. Dispensers - Gilbarco', description: 'Gilbarco Encore Model E700 3+1 (four grade, diesel, Flexpay 6)', qty: 1, price: 0 },
             { category: 'G. Dispensers - Gilbarco', description: 'Gilbarco Encore Model E700 3+0 (three grade, Flexpay 6)', qty: 1, price: 0 },
             { category: 'G. Dispensers - Gilbarco', description: 'OPW Hanging Hardware (Unleaded/Premium)', qty: 1, price: 0 },
-            { category: 'G. Dispensers - Gilbarco', description: 'OPW Hanging Hardware (Diesel)', qty: 1, price: 0 }
+            { category: 'G. Dispensers - Gilbarco', description: 'OPW Hanging Hardware (Diesel)', qty: 1, price: 0 },
+            
+            // H. CANOPY EQUIPMENT
+            { category: 'H. Canopy Equipment', description: 'Canopy Structure (specify dimensions)', qty: 1, price: 0 },
+            { category: 'H. Canopy Equipment', description: 'LED Lighting Package', qty: 1, price: 0 },
+            { category: 'H. Canopy Equipment', description: 'Fascia/Signage', qty: 1, price: 0 },
+            { category: 'H. Canopy Equipment', description: 'Canopy Installation', qty: 1, price: 0 }
         ];
         
         this.data.items = defaults;
