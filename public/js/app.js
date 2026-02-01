@@ -146,10 +146,7 @@ const app = {
             }
             
             // Show auto-save indicator
-            const autoSaveMsg = document.createElement('div');
-            autoSaveMsg.style.cssText = 'text-align: center; padding: 10px; background: #d4edda; color: #155724; font-weight: 600;';
-            autoSaveMsg.innerHTML = '💾 Your changes are auto-saved as you type';
-            document.querySelector('.actions').appendChild(autoSaveMsg);
+
             
             // Disable add/remove buttons on categories (contractor can only edit prices)
             document.addEventListener('click', (e) => {
