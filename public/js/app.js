@@ -675,17 +675,22 @@ const app = {
     async loadFromDatabase(jobId) {
         try {
             const response = await fetch(`/api/jobs/${jobId}`);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
             const job = await response.json();
             
+            // Map database fields to data object
             this.data.id = job.id;
             this.data.clientName = job.client_name || '';
             this.data.siteAddress = job.site_address || '';
             this.data.quoteDate = job.quote_date || '';
             this.data.quoteNumber = job.quote_number || '';
-            this.data.companyName = job.company_name || '';
-            this.data.contactName = job.contact_name || '';
-            this.data.phone = job.phone || '';
-            this.data.email = job.email || '';
+            this.data.companyName = job.company_name || 'Petroleum Network Solutions';
+            this.data.contactName = job.contact_name || 'Thomas Lyons';
+            this.data.phone = job.phone || '817-888-6167';
+            this.data.email = job.email || 'tlyons@petronetwrksolutions.com';
             this.data.projectNotes = job.project_notes || '';
             this.data.taxRate = parseFloat(job.tax_rate) || 8.25;
             this.data.discount = parseFloat(job.discount) || 0;
@@ -698,9 +703,11 @@ const app = {
             this.data.items = job.items || [];
             
             this.populateForm();
+            this.showNotification('✓ Job loaded from database');
             return true;
         } catch (error) {
             console.error('Error loading from database:', error);
+            this.showNotification('⚠️ Failed to load job from database', 3000);
             return false;
         }
     },
