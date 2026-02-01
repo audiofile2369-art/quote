@@ -148,15 +148,7 @@ const app = {
             // Show auto-save indicator
 
             
-            // Disable add/remove buttons on categories (contractor can only edit prices)
-            document.addEventListener('click', (e) => {
-                if (e.target.classList.contains('btn-remove') || 
-                    e.target.classList.contains('btn-add-section')) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    this.showNotification('You cannot add/remove items in contractor mode');
-                }
-            }, true);
+
         }
     },
 
@@ -554,11 +546,12 @@ const app = {
                 const total = (item.qty || 0) * (item.price || 0);
                 const escapedDesc = (item.description || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
                 
-                // In contractor mode for assigned sections, only price is editable
+                // In contractor mode, allow full editing within assigned sections; lock others
                 const isContractorSection = this.data.mode === 'contractor' && this.data.contractorSections.includes(category);
-                const descReadonly = (this.data.mode === 'contractor' || isContractorSection) ? 'readonly style="background: #e9ecef; cursor: not-allowed;"' : '';
-                const qtyReadonly = (this.data.mode === 'contractor' || isContractorSection) ? 'readonly style="background: #e9ecef; cursor: not-allowed;"' : '';
-                const removeBtn = this.data.mode !== 'contractor' ? `<button class="btn-remove" onclick="app.removeItem(${index})">×</button>` : '';
+                const readOnlyStyle = 'readonly style="background: #e9ecef; cursor: not-allowed;"';
+                const descReadonly = (this.data.mode === 'contractor' && !isContractorSection) ? readOnlyStyle : '';
+                const qtyReadonly = (this.data.mode === 'contractor' && !isContractorSection) ? readOnlyStyle : '';
+                const removeBtn = (this.data.mode !== 'contractor' || isContractorSection) ? `<button class="btn-remove" onclick="app.removeItem(${index})">×</button>` : '';
                 
                 row.innerHTML = `
                     <td><input type="text" value="${escapedDesc}" onchange="app.updateItem(${index}, 'description', this.value)" ${descReadonly}></td>
