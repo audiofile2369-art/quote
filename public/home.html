@@ -3,7 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My Jobs - Estimator</title>
+    <title>FuelServicePro - My Jobs</title>
+    <link rel="icon" href="/fuelservicepro_logo.png" type="image/png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/style.css">
     <style>
         .jobs-container {
@@ -20,12 +24,12 @@
         }
 
         .jobs-header h1 {
-            color: #c41e3a;
+            color: #f97316;
             font-size: 2em;
         }
 
         .btn-new-job {
-            background: linear-gradient(135deg, #c41e3a 0%, #8b0000 100%);
+            background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
             color: white;
             border: none;
             padding: 12px 24px;
@@ -54,7 +58,7 @@
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
             cursor: pointer;
             transition: all 0.3s;
-            border-left: 4px solid #c41e3a;
+            border-left: 4px solid #f97316;
         }
 
         .job-card:hover {
@@ -63,7 +67,7 @@
         }
 
         .job-card h3 {
-            color: #c41e3a;
+            color: #f97316;
             margin-bottom: 10px;
             font-size: 1.3em;
         }
@@ -120,8 +124,13 @@
 <body>
     <div class="container">
         <header>
-            <h1>📋 Petroleum Network Solutions</h1>
-            <p>Project Estimator & Quote Management</p>
+            <div style="display: flex; align-items: center; gap: 15px; justify-content: center;">
+                <img src="/fuelservicepro_logo.png" alt="FuelServicePro" style="height: 60px; width: auto;">
+                <div style="text-align: left;">
+                    <h1 style="margin: 0;">FuelServicePro</h1>
+                    <p style="margin: 5px 0 0 0;">Project Estimator & Quote Management</p>
+                </div>
+            </div>
         </header>
 
         <div class="jobs-container">
