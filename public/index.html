@@ -16,7 +16,7 @@
                     <h1>🛢️ PNS Estimator</h1>
                     <p>Petroleum Network Solutions - Quote Builder</p>
                 </div>
-                <button onclick="window.location.href='/'" style="background: white; color: #c41e3a; border: 2px solid white; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 600; transition: all 0.2s;">
+                <button onclick="window.location.href='/home.html'" style="background: white; color: #c41e3a; border: 2px solid white; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 600; transition: all 0.2s;">
                     ← Back to Jobs
                 </button>
             </div>
@@ -75,7 +75,7 @@
             </div>
             
             <div style="margin-top: 20px;">
-                <button onclick="app.save()" class="btn" style="width: 100%; padding: 15px; font-size: 16px; background: #28a745; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">
+                <button onclick="app.save(); app.saveToDatabase(true);" class="btn" style="width: 100%; padding: 15px; font-size: 16px; background: #28a745; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">
                     💾 Save Project Info
                 </button>
             </div>

@@ -24,6 +24,8 @@ const app = {
         contractorSection: null, // which section the contractor can edit
         contractorSections: [] // multiple sections for contractor
     },
+    
+    saveTimeout: null, // For debouncing saves
 
     async init() {
         // Set today's date
@@ -484,20 +486,25 @@ const app = {
         this.data.scopeOfWork = document.getElementById('scopeOfWork')?.value || '';
         this.data.disclaimers = document.getElementById('disclaimers')?.value || '';
         
-        // Save to database if we have an ID and not in contractor mode with data URL
+        // Save to localStorage immediately
+        localStorage.setItem('estimatorData', JSON.stringify(this.data));
+        
+        // Debounce database save (only save after 2 seconds of no changes)
+        clearTimeout(this.saveTimeout);
+        this.saveTimeout = setTimeout(() => {
+            this.saveToDatabase(false);
+        }, 2000);
+    },
+    
+    async saveToDatabase(showNotification = false) {
+        // Save to database if not in contractor mode with data URL
         const params = new URLSearchParams(window.location.search);
         const hasDataParam = params.get('data');
         
-        if (!hasDataParam) {
-            await this.saveToDatabase();
-            this.showNotification('✓ Saved to database!');
+        if (hasDataParam) {
+            return; // Don't save if viewing from shared link
         }
         
-        // Also save to localStorage as backup
-        localStorage.setItem('estimatorData', JSON.stringify(this.data));
-    },
-
-    async saveToDatabase() {
         try {
             const method = this.data.id ? 'PUT' : 'POST';
             const url = this.data.id ? `/api/jobs/${this.data.id}` : '/api/jobs';
@@ -520,10 +527,16 @@ const app = {
                 window.history.replaceState({}, '', `/?jobId=${result.id}`);
             }
             
+            if (showNotification) {
+                this.showNotification('✓ Saved to database!');
+            }
+            
             return true;
         } catch (error) {
             console.error('Error saving to database:', error);
-            this.showNotification('⚠️ Failed to save to database', 3000);
+            if (showNotification) {
+                this.showNotification('⚠️ Failed to save to database', 3000);
+            }
             return false;
         }
     },
