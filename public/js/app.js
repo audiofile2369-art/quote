@@ -933,18 +933,20 @@ const app = {
         });
     },
     
-    sendToContractor() {
+    async sendToContractor() {
         this.save();
-        const encoded = btoa(JSON.stringify(this.data));
-        const url = `${window.location.origin}${window.location.pathname}?data=${encoded}&mode=contractor`;
-        
-        // Copy to clipboard
+        await this.saveToDatabase(true);
+        if (!this.data.id) {
+            alert('Failed to create job ID. Please try saving the project first.');
+            return;
+        }
+        const url = `${window.location.origin}${window.location.pathname}?jobId=${this.data.id}&mode=contractor`;
         navigator.clipboard.writeText(url).then(() => {
             this.showNotification('✓ Contractor link copied! Send this to your contractor.', 5000);
         }).catch(() => {
             prompt('Copy this contractor URL:', url);
         });
-    },
+    }
     
     async sendBackToOwner() {
         // In contractor mode, persist changes to the database for the existing job
@@ -966,19 +968,29 @@ const app = {
         }
     },
     
-    sendSectionToContractor(category) {
-        this.save();
-        const encoded = btoa(JSON.stringify(this.data));
-        const url = `${window.location.origin}${window.location.pathname}?data=${encoded}&mode=contractor&section=${encodeURIComponent(category)}`;
+    async sendSectionToContractor(category) {
+        const contractorName = prompt(`Enter contractor name for ${category}:`);
+        if (!contractorName || !contractorName.trim()) return;
+        const cleanName = contractorName.trim();
         
+        // Assign this single section and persist to DB to ensure jobId exists
+        this.data.contractorAssignments[cleanName] = Array.from(new Set([...(this.data.contractorAssignments[cleanName] || []), category]));
+        this.save();
+        await this.saveToDatabase(true);
+        if (!this.data.id) {
+            alert('Failed to create job ID. Please try saving the project first.');
+            return;
+        }
+        
+        const url = `${window.location.origin}${window.location.pathname}?jobId=${this.data.id}&mode=contractor&contractor=${encodeURIComponent(cleanName)}`;
         navigator.clipboard.writeText(url).then(() => {
-            this.showNotification(`✓ Link for "${category}" copied! Send this to your contractor.`, 5000);
+            this.showNotification(`✓ Link for "${category}" copied for ${cleanName}!`, 5000);
         }).catch(() => {
             prompt('Copy this contractor URL:', url);
         });
     },
     
-    sendSelectedSectionsToContractor() {
+    async sendSelectedSectionsToContractor() {
         const checkboxes = document.querySelectorAll('.section-checkbox:checked');
         const selectedCategories = Array.from(checkboxes).map(cb => cb.dataset.category);
         
@@ -987,27 +999,27 @@ const app = {
             return;
         }
         
-        // Ask for contractor name
         const contractorName = prompt(`Enter contractor name:\n(This will identify which sections they can edit)`);
-        
         if (!contractorName || !contractorName.trim()) {
             alert('Contractor name is required');
             return;
         }
-        
         const cleanName = contractorName.trim();
         
-        // Save contractor assignment
+        // Save contractor assignment and persist job to get an ID
         this.data.contractorAssignments[cleanName] = selectedCategories;
         this.save();
+        await this.saveToDatabase(true);
+        if (!this.data.id) {
+            alert('Failed to create job ID. Please try saving the project first.');
+            return;
+        }
         
-        // Generate URL with contractor name
-        const encoded = btoa(JSON.stringify(this.data));
-        const url = `${window.location.origin}${window.location.pathname}?data=${encoded}&mode=contractor&contractor=${encodeURIComponent(cleanName)}`;
+        // Generate URL using jobId (not data), so contractor loads/saves to the same job
+        const url = `${window.location.origin}${window.location.pathname}?jobId=${this.data.id}&mode=contractor&contractor=${encodeURIComponent(cleanName)}`;
         
         navigator.clipboard.writeText(url).then(() => {
             this.showNotification(`✓ Link for ${cleanName} copied! (${selectedCategories.length} section${selectedCategories.length > 1 ? 's' : ''})`, 5000);
-            // Uncheck all boxes
             checkboxes.forEach(cb => cb.checked = false);
         }).catch(() => {
             prompt('Copy this contractor URL:', url);
