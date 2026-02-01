@@ -615,6 +615,16 @@ const app = {
             tableContainer.appendChild(table);
             section.appendChild(tableContainer);
             
+            // Calculate and display section total
+            const sectionTotal = categories[category].reduce((sum, { item }) => {
+                return sum + ((item.qty || 0) * (item.price || 0));
+            }, 0);
+            
+            const sectionTotalDiv = document.createElement('div');
+            sectionTotalDiv.style.cssText = 'background: #f8f9fa; padding: 12px 20px; border-radius: 0 0 6px 6px; text-align: right; font-weight: 600; font-size: 16px; color: #495057; border: 1px solid #dee2e6; border-top: none;';
+            sectionTotalDiv.innerHTML = `Section Total: <span style="color: #f97316; font-size: 18px;">$${sectionTotal.toFixed(2)}</span>`;
+            section.appendChild(sectionTotalDiv);
+            
             // Add button for this category (only in owner mode or contractor's own sections)
             if (this.data.mode !== 'contractor' || this.data.contractorSections.includes(category)) {
                 const addBtn = document.createElement('button');
@@ -688,6 +698,14 @@ const app = {
     },
 
     calculateTotals() {
+        // Group items by category
+        const categories = {};
+        this.data.items.forEach(item => {
+            const cat = item.category || 'Uncategorized';
+            if (!categories[cat]) categories[cat] = 0;
+            categories[cat] += (item.qty || 0) * (item.price || 0);
+        });
+        
         const subtotal = this.data.items.reduce((sum, item) => {
             return sum + ((item.qty || 0) * (item.price || 0));
         }, 0);
@@ -704,6 +722,47 @@ const app = {
         
         this.data.taxRate = taxRate * 100;
         this.data.discount = discount;
+        
+        // Render section breakdown on summary page
+        this.renderSectionBreakdown(categories, subtotal);
+    },
+    
+    renderSectionBreakdown(categories, subtotal) {
+        const container = document.getElementById('sectionBreakdown');
+        if (!container) return;
+        
+        const sortedCategories = Object.entries(categories).sort((a, b) => b[1] - a[1]);
+        
+        if (sortedCategories.length === 0) {
+            container.innerHTML = '';
+            return;
+        }
+        
+        let html = '<h3 style="color: #495057; margin-bottom: 15px;">Cost Breakdown by Section</h3>';
+        html += '<div style="background: white; border-radius: 8px; overflow: hidden; border: 1px solid #dee2e6;">';
+        
+        sortedCategories.forEach(([category, total], index) => {
+            const percentage = subtotal > 0 ? (total / subtotal * 100).toFixed(1) : 0;
+            const isLast = index === sortedCategories.length - 1;
+            
+            html += `
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 15px 20px; ${!isLast ? 'border-bottom: 1px solid #f0f0f0;' : ''}">
+                    <div style="flex: 1;">
+                        <div style="font-weight: 600; color: #333; margin-bottom: 5px;">${category}</div>
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <div style="flex: 1; max-width: 200px; height: 8px; background: #e9ecef; border-radius: 4px; overflow: hidden;">
+                                <div style="width: ${percentage}%; height: 100%; background: linear-gradient(90deg, #3b82f6, #f97316); border-radius: 4px;"></div>
+                            </div>
+                            <span style="font-size: 13px; color: #6c757d; min-width: 50px;">${percentage}%</span>
+                        </div>
+                    </div>
+                    <div style="font-weight: 600; font-size: 18px; color: #f97316; min-width: 120px; text-align: right;">$${total.toFixed(2)}</div>
+                </div>
+            `;
+        });
+        
+        html += '</div>';
+        container.innerHTML = html;
     },
 
     async save() {
