@@ -1,6 +1,7 @@
 // Main application object
 const app = {
     data: {
+        id: null, // Database job ID
         clientName: '',
         siteAddress: '',
         quoteDate: '',
@@ -20,18 +21,29 @@ const app = {
         sectionScopes: {}, // { 'category': 'scope text' }
         sectionDisclaimers: {}, // { 'category': 'disclaimer text' }
         mode: 'owner', // 'owner' or 'contractor'
-        contractorSection: null // which section the contractor can edit
+        contractorSection: null, // which section the contractor can edit
+        contractorSections: [] // multiple sections for contractor
     },
 
-    init() {
+    async init() {
         // Set today's date
         document.getElementById('quoteDate').value = new Date().toISOString().split('T')[0];
         
-        // Load from URL or localStorage
-        this.loadFromURL() || this.loadFromStorage();
-        
-        // Check URL for mode and section parameters AFTER loading data
+        // Check URL parameters
         const params = new URLSearchParams(window.location.search);
+        const jobId = params.get('jobId');
+        const dataParam = params.get('data');
+        
+        // Load from database if jobId, otherwise from URL data parameter
+        if (jobId) {
+            await this.loadFromDatabase(jobId);
+        } else if (dataParam) {
+            this.loadFromURL();
+        } else {
+            this.loadFromStorage();
+        }
+        
+        // Check for contractor mode AFTER loading data
         if (params.get('mode') === 'contractor') {
             this.data.mode = 'contractor';
             this.data.contractorSection = params.get('section');
@@ -457,7 +469,7 @@ const app = {
         this.data.discount = discount;
     },
 
-    save() {
+    async save() {
         // Collect all form data
         this.data.clientName = document.getElementById('clientName')?.value || '';
         this.data.siteAddress = document.getElementById('siteAddress')?.value || '';
@@ -472,8 +484,70 @@ const app = {
         this.data.scopeOfWork = document.getElementById('scopeOfWork')?.value || '';
         this.data.disclaimers = document.getElementById('disclaimers')?.value || '';
         
-        // Save to localStorage
+        // Save to database if we have an ID and not in contractor mode with data URL
+        const params = new URLSearchParams(window.location.search);
+        if (this.data.id && !params.get('data')) {
+            await this.saveToDatabase();
+        }
+        
+        // Also save to localStorage as backup
         localStorage.setItem('estimatorData', JSON.stringify(this.data));
+    },
+
+    async saveToDatabase() {
+        try {
+            const method = this.data.id ? 'PUT' : 'POST';
+            const url = this.data.id ? `/api/jobs/${this.data.id}` : '/api/jobs';
+            
+            const response = await fetch(url, {
+                method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(this.data)
+            });
+            
+            const result = await response.json();
+            
+            if (!this.data.id && result.id) {
+                this.data.id = result.id;
+                // Update URL to include jobId
+                window.history.replaceState({}, '', `/quote.html?jobId=${result.id}`);
+            }
+        } catch (error) {
+            console.error('Error saving to database:', error);
+        }
+    },
+
+    async loadFromDatabase(jobId) {
+        try {
+            const response = await fetch(`/api/jobs/${jobId}`);
+            const job = await response.json();
+            
+            this.data.id = job.id;
+            this.data.clientName = job.client_name || '';
+            this.data.siteAddress = job.site_address || '';
+            this.data.quoteDate = job.quote_date || '';
+            this.data.quoteNumber = job.quote_number || '';
+            this.data.companyName = job.company_name || '';
+            this.data.contactName = job.contact_name || '';
+            this.data.phone = job.phone || '';
+            this.data.email = job.email || '';
+            this.data.projectNotes = job.project_notes || '';
+            this.data.taxRate = parseFloat(job.tax_rate) || 8.25;
+            this.data.discount = parseFloat(job.discount) || 0;
+            this.data.paymentTerms = job.payment_terms || '';
+            this.data.scopeOfWork = job.scope_of_work || '';
+            this.data.disclaimers = job.disclaimers || '';
+            this.data.files = job.files || [];
+            this.data.sectionScopes = job.section_scopes || {};
+            this.data.sectionDisclaimers = job.section_disclaimers || {};
+            this.data.items = job.items || [];
+            
+            this.populateForm();
+            return true;
+        } catch (error) {
+            console.error('Error loading from database:', error);
+            return false;
+        }
     },
 
     loadFromStorage() {

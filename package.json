@@ -1,12 +1,21 @@
 {
   "name": "estimator",
   "version": "1.0.0",
-  "description": "Simple estimator/quote builder for petroleum equipment",
+  "description": "Project estimator with contractor collaboration",
+  "main": "server.js",
+  "type": "module",
   "scripts": {
-    "dev": "npx serve public",
+    "start": "node server.js",
+    "dev": "node server.js",
     "build": "echo 'No build needed - static site'"
   },
   "keywords": ["estimator", "quote", "bid"],
   "author": "",
-  "license": "ISC"
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.21.2",
+    "pg": "^8.11.3",
+    "dotenv": "^16.3.1",
+    "cors": "^2.8.5"
+  }
 }
