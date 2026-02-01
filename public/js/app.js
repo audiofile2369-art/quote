@@ -24,8 +24,6 @@ const app = {
         contractorSection: null, // which section the contractor can edit
         contractorSections: [] // multiple sections for contractor
     },
-    
-    saveTimeout: null, // For debouncing saves
 
     async init() {
         // Set today's date
@@ -211,92 +209,13 @@ const app = {
     },
 
     switchTab(tabName) {
-        console.log('Switching to tab:', tabName);
-        
         // Hide all tabs
-        document.querySelectorAll('.tab-content').forEach(el => {
-            el.classList.remove('active');
-            el.style.display = 'none';
-        });
-        
+        document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
         document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
         
         // Show selected tab
-        const selectedTab = document.getElementById(`tab-${tabName}`);
-        console.log('Selected tab element:', selectedTab);
-        
-        if (selectedTab) {
-            selectedTab.classList.add('active');
-            selectedTab.style.display = 'block';
-        } else {
-            console.error(`Tab with id "tab-${tabName}" not found`);
-        }
-        
-        // Add active class to clicked tab button
-        document.querySelectorAll('.tab').forEach(tab => {
-            if (tab.getAttribute('onclick')?.includes(`'${tabName}'`)) {
-                tab.classList.add('active');
-            }
-        });
-        
-        // Refresh section scopes/disclaimers when switching to those tabs
-        if (tabName === 'scope') {
-            this.renderSectionScopes();
-        } else if (tabName === 'disclaimers') {
-            this.renderSectionDisclaimers();
-        }
-        
-        console.log('Tab switch complete');
-    },
-    
-    renderSectionScopes() {
-        const container = document.getElementById('sectionScopesDisplay');
-        if (!container) return;
-        
-        const sections = Object.keys(this.data.sectionScopes || {});
-        if (sections.length === 0) {
-            container.innerHTML = '';
-            return;
-        }
-        
-        container.innerHTML = '<h3 style="margin-top: 30px; color: #c41e3a;">Section-Specific Scopes</h3>';
-        
-        sections.forEach(sectionName => {
-            const scope = this.data.sectionScopes[sectionName];
-            if (scope && scope.trim()) {
-                container.innerHTML += `
-                    <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 15px; border-left: 4px solid #c41e3a;">
-                        <h4 style="color: #c41e3a; margin-bottom: 10px;">${sectionName}</h4>
-                        <p style="white-space: pre-wrap; color: #333; line-height: 1.6;">${scope}</p>
-                    </div>
-                `;
-            }
-        });
-    },
-    
-    renderSectionDisclaimers() {
-        const container = document.getElementById('sectionDisclaimersDisplay');
-        if (!container) return;
-        
-        const sections = Object.keys(this.data.sectionDisclaimers || {});
-        if (sections.length === 0) {
-            container.innerHTML = '';
-            return;
-        }
-        
-        container.innerHTML = '<h3 style="margin-top: 30px; color: #c41e3a;">Section-Specific Disclaimers</h3>';
-        
-        sections.forEach(sectionName => {
-            const disclaimer = this.data.sectionDisclaimers[sectionName];
-            if (disclaimer && disclaimer.trim()) {
-                container.innerHTML += `
-                    <div style="background: #fff3cd; padding: 15px; border-radius: 8px; margin-bottom: 15px; border-left: 4px solid #ffc107;">
-                        <h4 style="color: #856404; margin-bottom: 10px;">${sectionName}</h4>
-                        <p style="white-space: pre-wrap; color: #333; line-height: 1.6;">${disclaimer}</p>
-                    </div>
-                `;
-            }
-        });
+        document.getElementById(`tab-${tabName}`).classList.add('active');
+        event.target.classList.add('active');
     },
 
     addItem() {
@@ -356,80 +275,6 @@ const app = {
         this.data.files.forEach((file, index) => {
             const fileItem = document.createElement('div');
             fileItem.className = 'file-item';
-            fileItem.style.cssText = 'background: white; padding: 15px; border-radius: 8px; margin-bottom: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center;';
-            
-            const sizeKB = (file.size / 1024).toFixed(1);
-            const isImage = file.type.startsWith('image/');
-            const isPDF = file.type === 'application/pdf';
-            
-            fileItem.innerHTML = `
-                <div style="flex: 1;">
-                    <strong style="color: #c41e3a;">📎 ${file.name}</strong>
-                    <div style="color: #666; font-size: 12px; margin-top: 5px;">
-                        ${file.type} • ${sizeKB} KB
-                    </div>
-                </div>
-                <div style="display: flex; gap: 10px;">
-                    ${isImage || isPDF ? `<button onclick="app.viewFile(${index})" class="btn" style="background: #17a2b8; padding: 8px 12px;">👁️ View</button>` : ''}
-                    <button onclick="app.downloadFile(${index})" class="btn" style="background: #28a745; padding: 8px 12px;">⬇️ Download</button>
-                    <button onclick="app.removeFile(${index})" class="btn-remove" style="padding: 8px 12px;">×</button>
-                </div>
-            `;
-            filesList.appendChild(fileItem);
-        });
-    },
-    
-    viewFile(index) {
-        const file = this.data.files[index];
-        if (!file) return;
-        
-        const isImage = file.type.startsWith('image/');
-        const isPDF = file.type === 'application/pdf';
-        
-        // Create modal
-        const modal = document.createElement('div');
-        modal.className = 'modal';
-        modal.style.zIndex = '10000';
-        
-        let content = '';
-        if (isImage) {
-            content = `<img src="${file.data}" style="max-width: 100%; max-height: 80vh; object-fit: contain;">`;
-        } else if (isPDF) {
-            content = `<iframe src="${file.data}" style="width: 100%; height: 80vh; border: none;"></iframe>`;
-        } else {
-            content = `<p>Preview not available for this file type. Please download to view.</p>`;
-        }
-        
-        modal.innerHTML = `
-            <div class="modal-content" style="max-width: 90%; max-height: 90vh; overflow: auto;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                    <h3>${file.name}</h3>
-                    <button onclick="app.closeModal()" class="btn" style="background: #dc3545;">Close</button>
-                </div>
-                <div style="text-align: center; background: #f5f5f5; padding: 20px; border-radius: 8px;">
-                    ${content}
-                </div>
-            </div>
-        `;
-        document.body.appendChild(modal);
-        setTimeout(() => modal.classList.add('show'), 10);
-    },
-
-    downloadFile(index) {
-        const file = this.data.files[index];
-        if (!file) return;
-        
-        // Create a temporary link and trigger download
-        const link = document.createElement('a');
-        link.href = file.data;
-        link.download = file.name;
-        link.style.display = 'none';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        
-        this.showNotification(`✓ Downloading ${file.name}`);
-    },
             
             const icon = file.type.includes('pdf') ? '📄' : 
                         file.type.includes('image') ? '🖼️' : '📎';
@@ -639,25 +484,17 @@ const app = {
         this.data.scopeOfWork = document.getElementById('scopeOfWork')?.value || '';
         this.data.disclaimers = document.getElementById('disclaimers')?.value || '';
         
-        // Save to localStorage immediately
-        localStorage.setItem('estimatorData', JSON.stringify(this.data));
-        
-        // Debounce database save (only save after 2 seconds of no changes)
-        clearTimeout(this.saveTimeout);
-        this.saveTimeout = setTimeout(() => {
-            this.saveToDatabase(false);
-        }, 2000);
-    },
-    
-    async saveToDatabase(showNotification = false) {
-        // Save to database if not in contractor mode with data URL
+        // Save to database if we have an ID and not in contractor mode with data URL
         const params = new URLSearchParams(window.location.search);
-        const hasDataParam = params.get('data');
-        
-        if (hasDataParam) {
-            return; // Don't save if viewing from shared link
+        if (this.data.id && !params.get('data')) {
+            await this.saveToDatabase();
         }
         
+        // Also save to localStorage as backup
+        localStorage.setItem('estimatorData', JSON.stringify(this.data));
+    },
+
+    async saveToDatabase() {
         try {
             const method = this.data.id ? 'PUT' : 'POST';
             const url = this.data.id ? `/api/jobs/${this.data.id}` : '/api/jobs';
@@ -668,51 +505,32 @@ const app = {
                 body: JSON.stringify(this.data)
             });
             
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            
             const result = await response.json();
             
             if (!this.data.id && result.id) {
                 this.data.id = result.id;
                 // Update URL to include jobId
-                window.history.replaceState({}, '', `/?jobId=${result.id}`);
+                window.history.replaceState({}, '', `/quote.html?jobId=${result.id}`);
             }
-            
-            if (showNotification) {
-                this.showNotification('✓ Saved to database!');
-            }
-            
-            return true;
         } catch (error) {
             console.error('Error saving to database:', error);
-            if (showNotification) {
-                this.showNotification('⚠️ Failed to save to database', 3000);
-            }
-            return false;
         }
     },
 
     async loadFromDatabase(jobId) {
         try {
             const response = await fetch(`/api/jobs/${jobId}`);
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            
             const job = await response.json();
             
-            // Map database fields to data object
             this.data.id = job.id;
             this.data.clientName = job.client_name || '';
             this.data.siteAddress = job.site_address || '';
             this.data.quoteDate = job.quote_date || '';
             this.data.quoteNumber = job.quote_number || '';
-            this.data.companyName = job.company_name || 'Petroleum Network Solutions';
-            this.data.contactName = job.contact_name || 'Thomas Lyons';
-            this.data.phone = job.phone || '817-888-6167';
-            this.data.email = job.email || 'tlyons@petronetwrksolutions.com';
+            this.data.companyName = job.company_name || '';
+            this.data.contactName = job.contact_name || '';
+            this.data.phone = job.phone || '';
+            this.data.email = job.email || '';
             this.data.projectNotes = job.project_notes || '';
             this.data.taxRate = parseFloat(job.tax_rate) || 8.25;
             this.data.discount = parseFloat(job.discount) || 0;
@@ -732,7 +550,6 @@ const app = {
             return true;
         } catch (error) {
             console.error('Error loading from database:', error);
-            this.showNotification('⚠️ Failed to load job from database', 3000);
             return false;
         }
     },
