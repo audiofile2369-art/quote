@@ -62,6 +62,10 @@ const app = {
             } else if (this.data.contractorSection) {
                 this.data.contractorSections = [this.data.contractorSection];
             }
+            
+            console.log('Contractor mode enabled');
+            console.log('Contractor sections:', this.data.contractorSections);
+            console.log('Total items:', this.data.items.length);
         }
         
         // Apply contractor mode restrictions
@@ -378,8 +382,11 @@ const app = {
             if (this.data.mode === 'contractor' && 
                 this.data.contractorSections.length > 0 && 
                 !this.data.contractorSections.includes(category)) {
+                console.log('Skipping category (not assigned to contractor):', category);
                 return;
             }
+            
+            console.log('Rendering category:', category, 'Items:', categories[category].length);
             
             const section = document.createElement('div');
             section.className = 'category-section';
