@@ -245,9 +245,10 @@ const app = {
         const files = event.target.files;
         
         Array.from(files).forEach(file => {
-            // Check file size (5MB limit)
-            if (file.size > 5 * 1024 * 1024) {
-                alert(`File ${file.name} is too large. Max size is 5MB.`);
+            // Check file size (2MB limit due to Vercel constraints)
+            // Base64 encoding increases size by ~33%, so 2MB file becomes ~2.7MB
+            if (file.size > 2 * 1024 * 1024) {
+                alert(`File ${file.name} is too large. Max size is 2MB due to server limits.\n\nFor larger files, consider using a file sharing service and adding a link in the project notes.`);
                 return;
             }
             
@@ -528,6 +529,9 @@ const app = {
             });
             
             if (!response.ok) {
+                if (response.status === 413) {
+                    throw new Error('Payload too large - files exceed server limit. Please use smaller files (max 2MB each) or fewer files.');
+                }
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
             
@@ -546,8 +550,16 @@ const app = {
             return true;
         } catch (error) {
             console.error('Error saving to database:', error);
+            
+            // Show user-friendly error message
+            let errorMsg = '⚠️ Failed to save to database';
+            if (error.message.includes('Payload too large')) {
+                errorMsg = '⚠️ Files too large! Please remove some files or use smaller ones.';
+                alert('Your files are too large to save.\n\nPlease:\n1. Remove large files and try again\n2. Use files under 2MB each\n3. Or use a file sharing service instead');
+            }
+            
             if (showNotification) {
-                this.showNotification('⚠️ Failed to save to database', 3000);
+                this.showNotification(errorMsg, 5000);
             }
             return false;
         }
