@@ -218,6 +218,63 @@ const app = {
         // Show selected tab
         document.getElementById(`tab-${tabName}`).classList.add('active');
         event.target.classList.add('active');
+        
+        // Refresh section scopes/disclaimers when switching to those tabs
+        if (tabName === 'scope') {
+            this.renderSectionScopes();
+        } else if (tabName === 'disclaimers') {
+            this.renderSectionDisclaimers();
+        }
+    },
+    
+    renderSectionScopes() {
+        const container = document.getElementById('sectionScopesDisplay');
+        if (!container) return;
+        
+        const sections = Object.keys(this.data.sectionScopes || {});
+        if (sections.length === 0) {
+            container.innerHTML = '';
+            return;
+        }
+        
+        container.innerHTML = '<h3 style="margin-top: 30px; color: #c41e3a;">Section-Specific Scopes</h3>';
+        
+        sections.forEach(sectionName => {
+            const scope = this.data.sectionScopes[sectionName];
+            if (scope && scope.trim()) {
+                container.innerHTML += `
+                    <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 15px; border-left: 4px solid #c41e3a;">
+                        <h4 style="color: #c41e3a; margin-bottom: 10px;">${sectionName}</h4>
+                        <p style="white-space: pre-wrap; color: #333; line-height: 1.6;">${scope}</p>
+                    </div>
+                `;
+            }
+        });
+    },
+    
+    renderSectionDisclaimers() {
+        const container = document.getElementById('sectionDisclaimersDisplay');
+        if (!container) return;
+        
+        const sections = Object.keys(this.data.sectionDisclaimers || {});
+        if (sections.length === 0) {
+            container.innerHTML = '';
+            return;
+        }
+        
+        container.innerHTML = '<h3 style="margin-top: 30px; color: #c41e3a;">Section-Specific Disclaimers</h3>';
+        
+        sections.forEach(sectionName => {
+            const disclaimer = this.data.sectionDisclaimers[sectionName];
+            if (disclaimer && disclaimer.trim()) {
+                container.innerHTML += `
+                    <div style="background: #fff3cd; padding: 15px; border-radius: 8px; margin-bottom: 15px; border-left: 4px solid #ffc107;">
+                        <h4 style="color: #856404; margin-bottom: 10px;">${sectionName}</h4>
+                        <p style="white-space: pre-wrap; color: #333; line-height: 1.6;">${disclaimer}</p>
+                    </div>
+                `;
+            }
+        });
     },
 
     addItem() {
