@@ -44,6 +44,16 @@ async function initDB() {
                 updated_at TIMESTAMP DEFAULT NOW()
             )
         `);
+        
+        // Add contractor_assignments column if it doesn't exist (for existing tables)
+        await client.query(`
+            DO $$ 
+            BEGIN 
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='jobs' AND column_name='contractor_assignments') THEN
+                    ALTER TABLE jobs ADD COLUMN contractor_assignments JSONB DEFAULT '{}';
+                END IF;
+            END $$;
+        `);
 
         await client.query(`
             CREATE TABLE IF NOT EXISTS job_items (
