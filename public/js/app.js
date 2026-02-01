@@ -493,8 +493,14 @@ const app = {
         this.data.scopeOfWork = document.getElementById('scopeOfWork')?.value || '';
         this.data.disclaimers = document.getElementById('disclaimers')?.value || '';
         
-        // Also save to localStorage as backup
-        localStorage.setItem('estimatorData', JSON.stringify(this.data));
+        // Save to localStorage as backup (without files to avoid quota issues)
+        try {
+            const backupData = { ...this.data };
+            delete backupData.files; // Don't save files to localStorage - too large
+            localStorage.setItem('estimatorData', JSON.stringify(backupData));
+        } catch (e) {
+            console.warn('Failed to save to localStorage:', e);
+        }
         
         // Save to database if not viewing a shared link
         const params = new URLSearchParams(window.location.search);
@@ -611,7 +617,9 @@ const app = {
         const saved = localStorage.getItem('estimatorData');
         if (saved) {
             try {
-                this.data = JSON.parse(saved);
+                const loadedData = JSON.parse(saved);
+                // Merge loaded data but ensure files array exists (it's not in localStorage)
+                this.data = { ...loadedData, files: [] };
                 this.populateForm();
                 return true;
             } catch (e) {
