@@ -486,8 +486,11 @@ const app = {
         
         // Save to database if we have an ID and not in contractor mode with data URL
         const params = new URLSearchParams(window.location.search);
-        if (this.data.id && !params.get('data')) {
+        const hasDataParam = params.get('data');
+        
+        if (!hasDataParam) {
             await this.saveToDatabase();
+            this.showNotification('✓ Saved to database!');
         }
         
         // Also save to localStorage as backup
@@ -505,15 +508,23 @@ const app = {
                 body: JSON.stringify(this.data)
             });
             
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
             const result = await response.json();
             
             if (!this.data.id && result.id) {
                 this.data.id = result.id;
                 // Update URL to include jobId
-                window.history.replaceState({}, '', `/quote.html?jobId=${result.id}`);
+                window.history.replaceState({}, '', `/?jobId=${result.id}`);
             }
+            
+            return true;
         } catch (error) {
             console.error('Error saving to database:', error);
+            this.showNotification('⚠️ Failed to save to database', 3000);
+            return false;
         }
     },
 
