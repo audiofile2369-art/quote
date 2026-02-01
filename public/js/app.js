@@ -481,7 +481,13 @@ const app = {
         if (this.data.mode !== 'contractor') {
             const selectAllBar = document.createElement('div');
             selectAllBar.style.cssText = 'display:flex; align-items:center; gap:10px; padding:10px; background:#f8f9fa; border:1px solid #dee2e6; border-radius:6px; margin-bottom:10px;';
-            selectAllBar.innerHTML = `<label style="display:flex; align-items:center; gap:8px; cursor:pointer;"><input type="checkbox" id="selectAllSections" style="width:18px; height:18px;"> <span style="font-weight:600; color:#495057;">Select All Sections</span></label>`;
+            selectAllBar.innerHTML = `
+                <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+                    <input type="checkbox" id="selectAllSections" style="width:18px; height:18px;"> 
+                    <span style="font-weight:600; color:#495057;">Select All Sections</span>
+                </label>
+                <div style="flex:1"></div>
+                <button class="btn-add-section" style="background:#007bff;" onclick="app.sendSelectedSectionsToContractor()">📤 Send Selected Sections to Contractor</button>`;
             container.appendChild(selectAllBar);
         }
         
