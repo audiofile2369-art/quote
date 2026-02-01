@@ -211,6 +211,8 @@ const app = {
     },
 
     switchTab(tabName) {
+        console.log('Switching to tab:', tabName);
+        
         // Hide all tabs
         document.querySelectorAll('.tab-content').forEach(el => {
             el.classList.remove('active');
@@ -221,9 +223,13 @@ const app = {
         
         // Show selected tab
         const selectedTab = document.getElementById(`tab-${tabName}`);
+        console.log('Selected tab element:', selectedTab);
+        
         if (selectedTab) {
             selectedTab.classList.add('active');
             selectedTab.style.display = 'block';
+        } else {
+            console.error(`Tab with id "tab-${tabName}" not found`);
         }
         
         // Add active class to clicked tab button
@@ -239,6 +245,8 @@ const app = {
         } else if (tabName === 'disclaimers') {
             this.renderSectionDisclaimers();
         }
+        
+        console.log('Tab switch complete');
     },
     
     renderSectionScopes() {
@@ -717,6 +725,9 @@ const app = {
             this.data.items = job.items || [];
             
             this.populateForm();
+            this.renderItems();
+            this.renderFiles();
+            this.calculateTotals();
             this.showNotification('✓ Job loaded from database');
             return true;
         } catch (error) {
