@@ -106,7 +106,12 @@ const app = {
                 <strong>👷 ${contractorNameDisplay}:</strong> You can fill in pricing for ${sectionsCount} section${sectionsCount !== 1 ? 's' : ''}. 
                 When done, click "Send Back to Owner" button below.
             `;
-            document.querySelector('.container').insertBefore(banner, document.querySelector('.tabs'));
+            
+            const tabsElement = document.querySelector('.tabs');
+            const containerElement = document.querySelector('.container');
+            if (tabsElement && containerElement) {
+                containerElement.insertBefore(banner, tabsElement);
+            }
             
             // Make project info fields read-only
             const readOnlyFields = ['clientName', 'siteAddress', 'quoteDate', 'quoteNumber', 
@@ -121,12 +126,19 @@ const app = {
                 }
             });
             
-            // Hide owner-only buttons and show contractor buttons ONLY
-            document.querySelector('.actions').innerHTML = `
-                <button onclick="app.sendBackToOwner()" class="btn btn-danger" style="font-size: 18px; padding: 18px 40px;">
+            // Add "Send Back to Owner" button after the tabs (no actions div in HTML)
+            const sendBackBtn = document.createElement('div');
+            sendBackBtn.style.cssText = 'text-align: center; padding: 20px; background: #f8f9fa; border-bottom: 2px solid #dee2e6;';
+            sendBackBtn.innerHTML = `
+                <button onclick="app.sendBackToOwner()" class="btn btn-danger" style="font-size: 18px; padding: 18px 40px; background: #28a745; border: none; border-radius: 6px; cursor: pointer; color: white; font-weight: 600;">
                     ✅ SEND BACK TO OWNER
                 </button>
+                <div style="margin-top: 10px; color: #155724; font-weight: 600;">💾 Your changes are auto-saved as you type</div>
             `;
+            
+            if (tabsElement && containerElement) {
+                tabsElement.parentNode.insertBefore(sendBackBtn, tabsElement.nextSibling);
+            }
             
             // Show auto-save indicator
             const autoSaveMsg = document.createElement('div');
