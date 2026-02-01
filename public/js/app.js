@@ -277,6 +277,80 @@ const app = {
         this.data.files.forEach((file, index) => {
             const fileItem = document.createElement('div');
             fileItem.className = 'file-item';
+            fileItem.style.cssText = 'background: white; padding: 15px; border-radius: 8px; margin-bottom: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center;';
+            
+            const sizeKB = (file.size / 1024).toFixed(1);
+            const isImage = file.type.startsWith('image/');
+            const isPDF = file.type === 'application/pdf';
+            
+            fileItem.innerHTML = `
+                <div style="flex: 1;">
+                    <strong style="color: #c41e3a;">📎 ${file.name}</strong>
+                    <div style="color: #666; font-size: 12px; margin-top: 5px;">
+                        ${file.type} • ${sizeKB} KB
+                    </div>
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    ${isImage || isPDF ? `<button onclick="app.viewFile(${index})" class="btn" style="background: #17a2b8; padding: 8px 12px;">👁️ View</button>` : ''}
+                    <button onclick="app.downloadFile(${index})" class="btn" style="background: #28a745; padding: 8px 12px;">⬇️ Download</button>
+                    <button onclick="app.removeFile(${index})" class="btn-remove" style="padding: 8px 12px;">×</button>
+                </div>
+            `;
+            filesList.appendChild(fileItem);
+        });
+    },
+    
+    viewFile(index) {
+        const file = this.data.files[index];
+        if (!file) return;
+        
+        const isImage = file.type.startsWith('image/');
+        const isPDF = file.type === 'application/pdf';
+        
+        // Create modal
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.style.zIndex = '10000';
+        
+        let content = '';
+        if (isImage) {
+            content = `<img src="${file.data}" style="max-width: 100%; max-height: 80vh; object-fit: contain;">`;
+        } else if (isPDF) {
+            content = `<iframe src="${file.data}" style="width: 100%; height: 80vh; border: none;"></iframe>`;
+        } else {
+            content = `<p>Preview not available for this file type. Please download to view.</p>`;
+        }
+        
+        modal.innerHTML = `
+            <div class="modal-content" style="max-width: 90%; max-height: 90vh; overflow: auto;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <h3>${file.name}</h3>
+                    <button onclick="app.closeModal()" class="btn" style="background: #dc3545;">Close</button>
+                </div>
+                <div style="text-align: center; background: #f5f5f5; padding: 20px; border-radius: 8px;">
+                    ${content}
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        setTimeout(() => modal.classList.add('show'), 10);
+    },
+
+    downloadFile(index) {
+        const file = this.data.files[index];
+        if (!file) return;
+        
+        // Create a temporary link and trigger download
+        const link = document.createElement('a');
+        link.href = file.data;
+        link.download = file.name;
+        link.style.display = 'none';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        this.showNotification(`✓ Downloading ${file.name}`);
+    },
             
             const icon = file.type.includes('pdf') ? '📄' : 
                         file.type.includes('image') ? '🖼️' : '📎';
