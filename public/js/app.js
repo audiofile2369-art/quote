@@ -477,6 +477,14 @@ const app = {
         
         container.innerHTML = '';
         
+        // Owner mode: Select All checkbox bar
+        if (this.data.mode !== 'contractor') {
+            const selectAllBar = document.createElement('div');
+            selectAllBar.style.cssText = 'display:flex; align-items:center; gap:10px; padding:10px; background:#f8f9fa; border:1px solid #dee2e6; border-radius:6px; margin-bottom:10px;';
+            selectAllBar.innerHTML = `<label style="display:flex; align-items:center; gap:8px; cursor:pointer;"><input type="checkbox" id="selectAllSections" style="width:18px; height:18px;"> <span style="font-weight:600; color:#495057;">Select All Sections</span></label>`;
+            container.appendChild(selectAllBar);
+        }
+        
         // Group items by category
         const categories = {};
         this.data.items.forEach((item, index) => {
@@ -592,6 +600,30 @@ const app = {
             buttonContainer.appendChild(newSectionBtn);
             
             container.appendChild(buttonContainer);
+            
+            // Wire up Select All behavior
+            const selectAll = document.getElementById('selectAllSections');
+            if (selectAll) {
+                const updateState = () => {
+                    const cbs = document.querySelectorAll('.section-checkbox');
+                    const total = cbs.length;
+                    const checked = Array.from(cbs).filter(cb => cb.checked).length;
+                    selectAll.checked = total > 0 && checked === total;
+                    selectAll.indeterminate = checked > 0 && checked < total;
+                };
+                
+                selectAll.addEventListener('change', () => {
+                    const cbs = document.querySelectorAll('.section-checkbox');
+                    cbs.forEach(cb => cb.checked = selectAll.checked);
+                    updateState();
+                });
+                
+                document.querySelectorAll('.section-checkbox').forEach(cb => {
+                    cb.addEventListener('change', updateState);
+                });
+                
+                updateState();
+            }
         }
     },
     
@@ -649,9 +681,10 @@ const app = {
             console.warn('Failed to save to localStorage:', e);
         }
         
-        // Save to database if not viewing a shared link
+        // Save to database
         const params = new URLSearchParams(window.location.search);
-        if (!params.get('data')) {
+        const allowDbSave = !params.get('data') || (this.data.mode === 'contractor' && this.data.id);
+        if (allowDbSave) {
             // Debounce database saves to avoid too many calls
             clearTimeout(this.saveTimeout);
             this.saveTimeout = setTimeout(() => {
@@ -911,18 +944,10 @@ const app = {
         });
     },
     
-    sendBackToOwner() {
-        this.save();
-        this.data.mode = 'owner'; // Send back as owner mode
-        const encoded = btoa(JSON.stringify(this.data));
-        const url = `${window.location.origin}${window.location.pathname}?data=${encoded}`;
-        
-        // Copy to clipboard
-        navigator.clipboard.writeText(url).then(() => {
-            this.showNotification('✓ Link copied! Send this back to the project owner.', 5000);
-        }).catch(() => {
-            prompt('Copy this URL and send to project owner:', url);
-        });
+    async sendBackToOwner() {
+        // In contractor mode, persist changes to the database for the existing job
+        await this.saveToDatabase(true);
+        this.showNotification('✓ Changes saved for owner. They can now open the job and see updates.', 5000);
     },
     
     addNewSection() {
