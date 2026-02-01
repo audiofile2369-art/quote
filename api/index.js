@@ -39,6 +39,7 @@ async function initDB() {
                 files JSONB DEFAULT '[]',
                 section_scopes JSONB DEFAULT '{}',
                 section_disclaimers JSONB DEFAULT '{}',
+                contractor_assignments JSONB DEFAULT '{}',
                 created_at TIMESTAMP DEFAULT NOW(),
                 updated_at TIMESTAMP DEFAULT NOW()
             )
@@ -123,8 +124,8 @@ app.post('/api/jobs', async (req, res) => {
                 client_name, site_address, quote_date, quote_number,
                 company_name, contact_name, phone, email,
                 project_notes, tax_rate, discount, payment_terms,
-                scope_of_work, disclaimers, files, section_scopes, section_disclaimers
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+                scope_of_work, disclaimers, files, section_scopes, section_disclaimers, contractor_assignments
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
             RETURNING id
         `, [
             req.body.clientName,
@@ -143,7 +144,8 @@ app.post('/api/jobs', async (req, res) => {
             req.body.disclaimers,
             JSON.stringify(req.body.files || []),
             JSON.stringify(req.body.sectionScopes || {}),
-            JSON.stringify(req.body.sectionDisclaimers || {})
+            JSON.stringify(req.body.sectionDisclaimers || {}),
+            JSON.stringify(req.body.contractorAssignments || {})
         ]);
 
         const jobId = jobResult.rows[0].id;
@@ -181,8 +183,8 @@ app.put('/api/jobs/:id', async (req, res) => {
                 company_name = $5, contact_name = $6, phone = $7, email = $8,
                 project_notes = $9, tax_rate = $10, discount = $11, payment_terms = $12,
                 scope_of_work = $13, disclaimers = $14, files = $15,
-                section_scopes = $16, section_disclaimers = $17, updated_at = NOW()
-            WHERE id = $18
+                section_scopes = $16, section_disclaimers = $17, contractor_assignments = $18, updated_at = NOW()
+            WHERE id = $19
         `, [
             req.body.clientName,
             req.body.siteAddress,
@@ -201,6 +203,7 @@ app.put('/api/jobs/:id', async (req, res) => {
             JSON.stringify(req.body.files || []),
             JSON.stringify(req.body.sectionScopes || {}),
             JSON.stringify(req.body.sectionDisclaimers || {}),
+            JSON.stringify(req.body.contractorAssignments || {}),
             req.params.id
         ]);
 

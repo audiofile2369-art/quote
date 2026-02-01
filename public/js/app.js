@@ -20,9 +20,11 @@ const app = {
         disclaimers: '',
         sectionScopes: {}, // { 'category': 'scope text' }
         sectionDisclaimers: {}, // { 'category': 'disclaimer text' }
+        contractorAssignments: {}, // { 'contractorName': ['Section A', 'Section B'] }
         mode: 'owner', // 'owner' or 'contractor'
-        contractorSection: null, // which section the contractor can edit
-        contractorSections: [] // multiple sections for contractor
+        contractorName: null, // contractor viewing this
+        contractorSection: null, // which section the contractor can edit (deprecated)
+        contractorSections: [] // multiple sections for contractor (deprecated)
     },
     
     saveTimeout: null, // For debouncing auto-saves
@@ -53,17 +55,25 @@ const app = {
         // Check for contractor mode AFTER loading data
         if (params.get('mode') === 'contractor') {
             this.data.mode = 'contractor';
-            this.data.contractorSection = params.get('section');
+            const contractorName = params.get('contractor');
             
-            // Check for multiple sections (comma-separated)
-            const sectionsParam = params.get('sections');
-            if (sectionsParam) {
-                this.data.contractorSections = sectionsParam.split(',').map(s => decodeURIComponent(s));
-            } else if (this.data.contractorSection) {
-                this.data.contractorSections = [this.data.contractorSection];
+            if (contractorName) {
+                this.data.contractorName = decodeURIComponent(contractorName);
+                // Get sections assigned to this contractor
+                this.data.contractorSections = this.data.contractorAssignments[this.data.contractorName] || [];
+            } else {
+                // Fallback to old method for backward compatibility
+                this.data.contractorSection = params.get('section');
+                const sectionsParam = params.get('sections');
+                if (sectionsParam) {
+                    this.data.contractorSections = sectionsParam.split(',').map(s => decodeURIComponent(s));
+                } else if (this.data.contractorSection) {
+                    this.data.contractorSections = [this.data.contractorSection];
+                }
             }
             
             console.log('Contractor mode enabled');
+            console.log('Contractor name:', this.data.contractorName);
             console.log('Contractor sections:', this.data.contractorSections);
             console.log('Total items:', this.data.items.length);
         }
@@ -88,11 +98,15 @@ const app = {
             const banner = document.createElement('div');
             banner.className = 'info-banner';
             banner.style.cssText = 'background: #fff3cd; border-left-color: #ffc107; margin: 20px; font-size: 16px;';
+            
+            const contractorNameDisplay = this.data.contractorName ? `<strong>${this.data.contractorName}</strong>` : 'Contractor';
+            const sectionsCount = this.data.contractorSections.length;
+            
             banner.innerHTML = `
-                <strong>👷 Contractor Mode:</strong> You can view project info, fill in your pricing, and upload additional documents. 
+                <strong>👷 ${contractorNameDisplay}:</strong> You can fill in pricing for ${sectionsCount} section${sectionsCount !== 1 ? 's' : ''}. 
                 When done, click "Send Back to Owner" button below.
             `;
-            document.querySelector('.container').insertBefore(banner, document.querySelector('.actions'));
+            document.querySelector('.container').insertBefore(banner, document.querySelector('.tabs'));
             
             // Make project info fields read-only
             const readOnlyFields = ['clientName', 'siteAddress', 'quoteDate', 'quoteNumber', 
@@ -645,6 +659,7 @@ const app = {
             this.data.files = job.files || [];
             this.data.sectionScopes = job.section_scopes || {};
             this.data.sectionDisclaimers = job.section_disclaimers || {};
+            this.data.contractorAssignments = job.contractor_assignments || {};
             this.data.items = job.items || [];
             
             console.log('Loaded files from database:', this.data.files);
@@ -850,13 +865,26 @@ const app = {
             return;
         }
         
+        // Ask for contractor name
+        const contractorName = prompt(`Enter contractor name:\n(This will identify which sections they can edit)`);
+        
+        if (!contractorName || !contractorName.trim()) {
+            alert('Contractor name is required');
+            return;
+        }
+        
+        const cleanName = contractorName.trim();
+        
+        // Save contractor assignment
+        this.data.contractorAssignments[cleanName] = selectedCategories;
         this.save();
+        
+        // Generate URL with contractor name
         const encoded = btoa(JSON.stringify(this.data));
-        const sectionsParam = selectedCategories.map(s => encodeURIComponent(s)).join(',');
-        const url = `${window.location.origin}${window.location.pathname}?data=${encoded}&mode=contractor&sections=${sectionsParam}`;
+        const url = `${window.location.origin}${window.location.pathname}?data=${encoded}&mode=contractor&contractor=${encodeURIComponent(cleanName)}`;
         
         navigator.clipboard.writeText(url).then(() => {
-            this.showNotification(`✓ Link for ${selectedCategories.length} section(s) copied! Send this to your contractor.`, 5000);
+            this.showNotification(`✓ Link for ${cleanName} copied! (${selectedCategories.length} section${selectedCategories.length > 1 ? 's' : ''})`, 5000);
             // Uncheck all boxes
             checkboxes.forEach(cb => cb.checked = false);
         }).catch(() => {
