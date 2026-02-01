@@ -24,6 +24,8 @@ const app = {
         contractorSection: null, // which section the contractor can edit
         contractorSections: [] // multiple sections for contractor
     },
+    
+    saveTimeout: null, // For debouncing auto-saves
 
     async init() {
         // Set today's date
@@ -484,14 +486,18 @@ const app = {
         this.data.scopeOfWork = document.getElementById('scopeOfWork')?.value || '';
         this.data.disclaimers = document.getElementById('disclaimers')?.value || '';
         
-        // Save to database if we have an ID and not in contractor mode with data URL
-        const params = new URLSearchParams(window.location.search);
-        if (this.data.id && !params.get('data')) {
-            await this.saveToDatabase();
-        }
-        
         // Also save to localStorage as backup
         localStorage.setItem('estimatorData', JSON.stringify(this.data));
+        
+        // Save to database if not viewing a shared link
+        const params = new URLSearchParams(window.location.search);
+        if (!params.get('data')) {
+            // Debounce database saves to avoid too many calls
+            clearTimeout(this.saveTimeout);
+            this.saveTimeout = setTimeout(() => {
+                this.saveToDatabase(false);
+            }, 1000);
+        }
     },
 
     async saveToDatabase(showNotification = false) {
