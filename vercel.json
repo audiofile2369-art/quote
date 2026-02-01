@@ -7,6 +7,10 @@
   },
   "rewrites": [
     {
+      "source": "/c/:code",
+      "destination": "/c.html"
+    },
+    {
       "source": "/api/(.*)",
       "destination": "/api"
     }

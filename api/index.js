@@ -54,6 +54,17 @@ async function initDB() {
                 END IF;
             END $$;
         `);
+        
+        // Create contractor_links table for short URLs
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS contractor_links (
+                id SERIAL PRIMARY KEY,
+                short_code VARCHAR(10) UNIQUE NOT NULL,
+                job_id INTEGER REFERENCES jobs(id) ON DELETE CASCADE,
+                contractor_name VARCHAR(255),
+                created_at TIMESTAMP DEFAULT NOW()
+            )
+        `);
 
         await client.query(`
             CREATE TABLE IF NOT EXISTS job_items (
@@ -243,6 +254,48 @@ app.put('/api/jobs/:id', async (req, res) => {
         res.status(500).json({ error: 'Failed to update job' });
     } finally {
         client.release();
+    }
+});
+
+// Create short link for contractor
+app.post('/api/contractor-links', async (req, res) => {
+    const client = await pool.connect();
+    try {
+        const { jobId, contractorName } = req.body;
+        
+        // Generate a short random code
+        const shortCode = Math.random().toString(36).substring(2, 8);
+        
+        await client.query(`
+            INSERT INTO contractor_links (short_code, job_id, contractor_name, created_at)
+            VALUES ($1, $2, $3, NOW())
+        `, [shortCode, jobId, contractorName]);
+        
+        res.json({ shortCode });
+    } catch (err) {
+        console.error('Error creating contractor link:', err);
+        res.status(500).json({ error: 'Failed to create link' });
+    } finally {
+        client.release();
+    }
+});
+
+// Get contractor link details
+app.get('/api/contractor-links/:shortCode', async (req, res) => {
+    try {
+        const result = await pool.query(
+            'SELECT job_id, contractor_name FROM contractor_links WHERE short_code = $1',
+            [req.params.shortCode]
+        );
+        
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Link not found' });
+        }
+        
+        res.json(result.rows[0]);
+    } catch (err) {
+        console.error('Error fetching contractor link:', err);
+        res.status(500).json({ error: 'Failed to fetch link' });
     }
 });
 

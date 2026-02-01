@@ -1080,16 +1080,37 @@ const app = {
         this.save();
         await this.saveToDatabase(true);
         
-        // Generate URL with contractor name using data param (includes jobId in data)
-        const encoded = btoa(JSON.stringify(this.data));
-        const url = `${window.location.origin}${window.location.pathname}?data=${encoded}&mode=contractor&contractor=${encodeURIComponent(cleanName)}`;
+        if (!this.data.id) {
+            alert('Failed to save job. Please try again.');
+            return;
+        }
         
-        navigator.clipboard.writeText(url).then(() => {
-            this.showNotification(`✓ Link for ${cleanName} copied! (${selectedCategories.length} section${selectedCategories.length > 1 ? 's' : ''})`, 5000);
-            checkboxes.forEach(cb => cb.checked = false);
-        }).catch(() => {
-            prompt('Copy this contractor URL:', url);
-        });
+        // Create short link via API
+        try {
+            const response = await fetch('/api/contractor-links', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    jobId: this.data.id,
+                    contractorName: cleanName
+                })
+            });
+            
+            if (!response.ok) throw new Error('Failed to create link');
+            
+            const { shortCode } = await response.json();
+            const url = `${window.location.origin}/c/${shortCode}`;
+            
+            navigator.clipboard.writeText(url).then(() => {
+                this.showNotification(`✓ Short link for ${cleanName} copied! (${selectedCategories.length} section${selectedCategories.length > 1 ? 's' : ''})`, 5000);
+                checkboxes.forEach(cb => cb.checked = false);
+            }).catch(() => {
+                prompt('Copy this contractor URL:', url);
+            });
+        } catch (error) {
+            console.error('Error creating short link:', error);
+            alert('Failed to create short link. Please try again.');
+        }
     },
     
     editSectionScope(category) {
