@@ -212,12 +212,26 @@ const app = {
 
     switchTab(tabName) {
         // Hide all tabs
-        document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(el => {
+            el.classList.remove('active');
+            el.style.display = 'none';
+        });
+        
         document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
         
         // Show selected tab
-        document.getElementById(`tab-${tabName}`).classList.add('active');
-        event.target.classList.add('active');
+        const selectedTab = document.getElementById(`tab-${tabName}`);
+        if (selectedTab) {
+            selectedTab.classList.add('active');
+            selectedTab.style.display = 'block';
+        }
+        
+        // Add active class to clicked tab button
+        document.querySelectorAll('.tab').forEach(tab => {
+            if (tab.getAttribute('onclick')?.includes(`'${tabName}'`)) {
+                tab.classList.add('active');
+            }
+        });
         
         // Refresh section scopes/disclaimers when switching to those tabs
         if (tabName === 'scope') {
