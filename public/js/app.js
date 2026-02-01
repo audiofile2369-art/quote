@@ -81,6 +81,11 @@ const app = {
         // Apply contractor mode restrictions
         this.applyModeRestrictions();
         
+        // For contractor mode, switch to Line Items tab automatically
+        if (this.data.mode === 'contractor') {
+            this.switchTab('items');
+        }
+        
         // Render initial items and files
         this.renderItems();
         this.renderFiles();
