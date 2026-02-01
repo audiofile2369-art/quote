@@ -683,11 +683,10 @@ const app = {
             console.warn('Failed to save to localStorage:', e);
         }
         
-        // Save to database
+        // Save to database even in contractor mode (data links) so owner sees updates
         const params = new URLSearchParams(window.location.search);
-        const allowDbSave = !params.get('data') || (this.data.mode === 'contractor' && this.data.id);
+        const allowDbSave = !params.get('data') || this.data.mode === 'contractor';
         if (allowDbSave) {
-            // Debounce database saves to avoid too many calls
             clearTimeout(this.saveTimeout);
             this.saveTimeout = setTimeout(() => {
                 this.saveToDatabase(false);
@@ -968,19 +967,27 @@ const app = {
         }
     },
     
-    sendSectionToContractor(category) {
+    async sendSectionToContractor(category) {
+        const contractorName = prompt(`Enter contractor name for ${category}:`);
+        if (!contractorName || !contractorName.trim()) return;
+        const cleanName = contractorName.trim();
+        
+        // Assign this single section and persist to DB to ensure job ID exists in data
+        this.data.contractorAssignments[cleanName] = Array.from(new Set([...(this.data.contractorAssignments[cleanName] || []), category]));
         this.save();
+        await this.saveToDatabase(true);
+        
         const encoded = btoa(JSON.stringify(this.data));
-        const url = `${window.location.origin}${window.location.pathname}?data=${encoded}&mode=contractor&section=${encodeURIComponent(category)}`;
+        const url = `${window.location.origin}${window.location.pathname}?data=${encoded}&mode=contractor&contractor=${encodeURIComponent(cleanName)}`;
         
         navigator.clipboard.writeText(url).then(() => {
-            this.showNotification(`✓ Link for "${category}" copied! Send this to your contractor.`, 5000);
+            this.showNotification(`✓ Link for "${category}" copied for ${cleanName}!`, 5000);
         }).catch(() => {
             prompt('Copy this contractor URL:', url);
         });
     },
     
-    sendSelectedSectionsToContractor() {
+    async sendSelectedSectionsToContractor() {
         const checkboxes = document.querySelectorAll('.section-checkbox:checked');
         const selectedCategories = Array.from(checkboxes).map(cb => cb.dataset.category);
         
@@ -996,11 +1003,12 @@ const app = {
         }
         const cleanName = contractorName.trim();
         
-        // Save contractor assignment
+        // Save contractor assignment and persist to DB to ensure job ID exists
         this.data.contractorAssignments[cleanName] = selectedCategories;
         this.save();
+        await this.saveToDatabase(true);
         
-        // Generate URL with contractor name using data param (works in shared links)
+        // Generate URL with contractor name using data param (includes jobId in data)
         const encoded = btoa(JSON.stringify(this.data));
         const url = `${window.location.origin}${window.location.pathname}?data=${encoded}&mode=contractor&contractor=${encodeURIComponent(cleanName)}`;
         
