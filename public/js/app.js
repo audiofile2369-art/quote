@@ -447,20 +447,22 @@ const app = {
         this.save();
     },
 
-    removeItem(index) {
+    async removeItem(index) {
         this.data.items.splice(index, 1);
         this.renderItems();
         this.calculateTotals();
         this.save();
+        await this.saveToDatabase(false);
     },
 
-    updateItem(index, field, value) {
+    async updateItem(index, field, value) {
         if (field === 'qty' || field === 'price') {
             value = parseFloat(value) || 0;
         }
         this.data.items[index][field] = value;
         this.calculateTotals();
         this.save();
+        await this.saveToDatabase(false);
     },
 
     renderItems() {
@@ -626,7 +628,7 @@ const app = {
         }
     },
     
-    addItemToCategory(category) {
+    async addItemToCategory(category) {
         this.data.items.push({
             category: category,
             description: '',
@@ -635,6 +637,7 @@ const app = {
         });
         this.renderItems();
         this.save();
+        await this.saveToDatabase(false);
     },
 
     calculateTotals() {
@@ -1053,20 +1056,22 @@ const app = {
         setTimeout(() => modal.classList.add('show'), 10);
     },
     
-    saveSectionScope(category) {
+    async saveSectionScope(category) {
         const text = document.getElementById('sectionScopeText').value;
         this.data.sectionScopes[category] = text;
         this.save();
+        await this.saveToDatabase(true);
         this.closeModal();
-        this.showNotification('✓ Scope of work saved!');
+        this.showNotification('✓ Scope of work saved to project!');
     },
     
-    saveSectionDisclaimers(category) {
+    async saveSectionDisclaimers(category) {
         const text = document.getElementById('sectionDisclaimersText').value;
         this.data.sectionDisclaimers[category] = text;
         this.save();
+        await this.saveToDatabase(true);
         this.closeModal();
-        this.showNotification('✓ Disclaimers saved!');
+        this.showNotification('✓ Disclaimers saved to project!');
     },
     
     closeModal() {
