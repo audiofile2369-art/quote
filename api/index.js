@@ -175,6 +175,11 @@ app.post('/api/jobs', async (req, res) => {
 app.put('/api/jobs/:id', async (req, res) => {
     const client = await pool.connect();
     try {
+        console.log('PUT /api/jobs/:id called');
+        console.log('Job ID:', req.params.id);
+        console.log('Items count:', req.body.items?.length);
+        console.log('Section scopes:', JSON.stringify(req.body.sectionScopes));
+        
         await client.query('BEGIN');
 
         await client.query(`
@@ -220,6 +225,7 @@ app.put('/api/jobs/:id', async (req, res) => {
         }
 
         await client.query('COMMIT');
+        console.log('Job updated successfully');
         res.json({ success: true });
     } catch (err) {
         await client.query('ROLLBACK');

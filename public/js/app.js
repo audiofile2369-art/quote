@@ -696,17 +696,24 @@ const app = {
 
     async saveToDatabase(showNotification = false) {
         try {
-            console.log('Saving to database...');
-            console.log('Files being saved:', this.data.files.length);
+            console.log('saveToDatabase called');
+            console.log('Job ID:', this.data.id);
+            console.log('Items being saved:', this.data.items.length);
+            console.log('Section scopes being saved:', JSON.stringify(this.data.sectionScopes));
             
             const method = this.data.id ? 'PUT' : 'POST';
             const url = this.data.id ? `/api/jobs/${this.data.id}` : '/api/jobs';
+            
+            console.log('API method:', method);
+            console.log('API URL:', url);
             
             const response = await fetch(url, {
                 method,
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(this.data)
             });
+            
+            console.log('API response status:', response.status);
             
             if (!response.ok) {
                 if (response.status === 413) {
@@ -716,6 +723,7 @@ const app = {
             }
             
             const result = await response.json();
+            console.log('API response:', result);
             
             if (!this.data.id && result.id) {
                 this.data.id = result.id;
@@ -830,6 +838,9 @@ const app = {
             try {
                 const decoded = atob(dataParam);
                 this.data = JSON.parse(decoded);
+                console.log('Loaded from URL - Job ID:', this.data.id);
+                console.log('Loaded from URL - Items:', this.data.items.length);
+                console.log('Loaded from URL - Contractor Assignments:', this.data.contractorAssignments);
                 this.populateForm();
                 this.showNotification('Data loaded from URL!');
                 return true;
@@ -949,8 +960,22 @@ const app = {
     
     async sendBackToOwner() {
         // In contractor mode, persist changes to the database for the existing job
-        await this.saveToDatabase(true);
-        this.showNotification('✓ Changes saved for owner. They can now open the job and see updates.', 5000);
+        console.log('sendBackToOwner called');
+        console.log('Job ID:', this.data.id);
+        console.log('Items count:', this.data.items.length);
+        console.log('Section scopes:', this.data.sectionScopes);
+        
+        if (!this.data.id) {
+            alert('Error: No job ID found. Changes cannot be saved to the project.');
+            return;
+        }
+        
+        const success = await this.saveToDatabase(true);
+        if (success) {
+            this.showNotification('✅ Your changes have been saved! The project owner will see your updates when they open the job.', 6000);
+        } else {
+            alert('Failed to save changes. Please try again.');
+        }
     },
     
     addNewSection() {
