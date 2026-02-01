@@ -241,35 +241,49 @@ const app = {
         this.save();
     },
     
-    handleFileUpload(event) {
-        const files = event.target.files;
+    addFileLink() {
+        const nameInput = document.getElementById('fileNameInput');
+        const urlInput = document.getElementById('fileUrlInput');
         
-        Array.from(files).forEach(file => {
-            // Check file size (2MB limit due to Vercel constraints)
-            // Base64 encoding increases size by ~33%, so 2MB file becomes ~2.7MB
-            if (file.size > 2 * 1024 * 1024) {
-                alert(`File ${file.name} is too large. Max size is 2MB due to server limits.\n\nFor larger files, consider using a file sharing service and adding a link in the project notes.`);
-                return;
-            }
-            
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                this.data.files.push({
-                    name: file.name,
-                    type: file.type,
-                    size: file.size,
-                    data: e.target.result
-                });
-                console.log('File added:', file.name);
-                console.log('Total files now:', this.data.files.length);
-                this.renderFiles();
-                this.save();
-            };
-            reader.readAsDataURL(file);
+        const name = nameInput.value.trim();
+        const url = urlInput.value.trim();
+        
+        if (!name) {
+            alert('Please enter a file name');
+            nameInput.focus();
+            return;
+        }
+        
+        if (!url) {
+            alert('Please enter a file URL');
+            urlInput.focus();
+            return;
+        }
+        
+        // Basic URL validation
+        try {
+            new URL(url);
+        } catch (e) {
+            alert('Please enter a valid URL (e.g., https://drive.google.com/...)');
+            urlInput.focus();
+            return;
+        }
+        
+        this.data.files.push({
+            name: name,
+            url: url,
+            addedAt: new Date().toISOString()
         });
         
-        // Clear the input
-        event.target.value = '';
+        console.log('File link added:', name);
+        console.log('Total file links now:', this.data.files.length);
+        
+        // Clear inputs
+        nameInput.value = '';
+        urlInput.value = '';
+        
+        this.renderFiles();
+        this.save();
     },
     
     renderFiles() {
@@ -277,7 +291,7 @@ const app = {
         if (!filesList) return;
         
         if (this.data.files.length === 0) {
-            filesList.innerHTML = '<p style="color: #999; font-style: italic;">No files uploaded yet</p>';
+            filesList.innerHTML = '<p style="color: #999; font-style: italic;">No file links added yet</p>';
             return;
         }
         
@@ -285,21 +299,37 @@ const app = {
         this.data.files.forEach((file, index) => {
             const fileItem = document.createElement('div');
             fileItem.className = 'file-item';
+            fileItem.style.cssText = 'background: white; padding: 15px; border-radius: 8px; margin-bottom: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center;';
             
-            const icon = file.type.includes('pdf') ? '📄' : 
-                        file.type.includes('image') ? '🖼️' : '📎';
+            // Determine icon based on file name extension or URL
+            let icon = '📎';
+            const nameLower = file.name.toLowerCase();
+            if (nameLower.includes('.pdf') || file.url?.includes('pdf')) {
+                icon = '📄';
+            } else if (nameLower.match(/\.(jpg|jpeg|png|gif|bmp|svg)$/)) {
+                icon = '🖼️';
+            } else if (nameLower.match(/\.(doc|docx)$/)) {
+                icon = '📝';
+            } else if (nameLower.match(/\.(xls|xlsx)$/)) {
+                icon = '📊';
+            }
             
-            const sizeKB = (file.size / 1024).toFixed(1);
+            const addedDate = file.addedAt ? new Date(file.addedAt).toLocaleDateString() : '';
             
             fileItem.innerHTML = `
-                <div class="file-info">
-                    <span class="file-icon">${icon}</span>
-                    <div>
-                        <div class="file-name">${file.name}</div>
-                        <div class="file-size">${sizeKB} KB</div>
+                <div style="flex: 1; cursor: pointer;" onclick="window.open('${file.url}', '_blank')">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <span style="font-size: 24px;">${icon}</span>
+                        <div>
+                            <div style="font-weight: 600; color: #c41e3a; margin-bottom: 3px;">${file.name}</div>
+                            <div style="color: #666; font-size: 12px;">
+                                ${addedDate ? `Added: ${addedDate} • ` : ''}
+                                <a href="${file.url}" target="_blank" onclick="event.stopPropagation()" style="color: #007bff; text-decoration: none;">Open link ↗</a>
+                            </div>
+                        </div>
                     </div>
                 </div>
-                <button class="btn-remove-file" onclick="app.removeFile(${index})">Remove</button>
+                <button onclick="app.removeFile(${index})" style="background: #dc3545; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; font-size: 12px;">Remove</button>
             `;
             
             filesList.appendChild(fileItem);
