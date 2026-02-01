@@ -494,7 +494,7 @@ const app = {
         localStorage.setItem('estimatorData', JSON.stringify(this.data));
     },
 
-    async saveToDatabase() {
+    async saveToDatabase(showNotification = false) {
         try {
             const method = this.data.id ? 'PUT' : 'POST';
             const url = this.data.id ? `/api/jobs/${this.data.id}` : '/api/jobs';
@@ -505,15 +505,29 @@ const app = {
                 body: JSON.stringify(this.data)
             });
             
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
             const result = await response.json();
             
             if (!this.data.id && result.id) {
                 this.data.id = result.id;
                 // Update URL to include jobId
-                window.history.replaceState({}, '', `/quote.html?jobId=${result.id}`);
+                window.history.replaceState({}, '', `/?jobId=${result.id}`);
             }
+            
+            if (showNotification) {
+                this.showNotification('✓ Saved to database!');
+            }
+            
+            return true;
         } catch (error) {
             console.error('Error saving to database:', error);
+            if (showNotification) {
+                this.showNotification('⚠️ Failed to save to database', 3000);
+            }
+            return false;
         }
     },
 
