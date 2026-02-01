@@ -37,12 +37,16 @@ const app = {
         const params = new URLSearchParams(window.location.search);
         const jobId = params.get('jobId');
         const dataParam = params.get('data');
+        const isNew = params.get('new');
         
         // Load from database if jobId, otherwise from URL data parameter
         if (jobId) {
             await this.loadFromDatabase(jobId);
         } else if (dataParam) {
             this.loadFromURL();
+        } else if (isNew === 'true') {
+            // New job - reset to defaults but keep company info
+            this.resetForNewJob();
         } else {
             // Try to load the most recent job from database
             const loaded = await this.loadMostRecentJob();
@@ -95,6 +99,49 @@ const app = {
         if (this.data.items.length === 0) {
             this.loadDefaultItems();
         }
+    },
+    
+    resetForNewJob() {
+        // Keep company info but clear client info
+        const companyName = this.data.companyName;
+        const contactName = this.data.contactName;
+        const phone = this.data.phone;
+        const email = this.data.email;
+        
+        // Reset to defaults
+        this.data = {
+            id: null,
+            clientName: '',
+            siteAddress: '',
+            quoteDate: new Date().toISOString().split('T')[0],
+            quoteNumber: '',
+            companyName: companyName,
+            contactName: contactName,
+            phone: phone,
+            email: email,
+            items: [],
+            files: [],
+            projectNotes: '',
+            taxRate: 8.25,
+            discount: 0,
+            paymentTerms: '',
+            scopeOfWork: '',
+            disclaimers: '',
+            sectionScopes: {},
+            sectionDisclaimers: {},
+            contractorAssignments: {},
+            mode: 'owner',
+            contractorName: null,
+            contractorSection: null,
+            contractorSections: []
+        };
+        
+        this.populateForm();
+        this.loadDefaultItems();
+        this.renderItems();
+        this.renderFiles();
+        this.calculateTotals();
+        this.showNotification('✨ New job created! Fill in the details and save.');
     },
     
     applyModeRestrictions() {

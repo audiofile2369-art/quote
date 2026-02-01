@@ -178,7 +178,8 @@
         }
 
         function createNewJob() {
-            window.location.href = '/';
+            // Clear any existing jobId and data params, force fresh start
+            window.location.href = '/?new=true';
         }
 
         function openJob(jobId) {
