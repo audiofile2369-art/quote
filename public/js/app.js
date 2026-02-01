@@ -277,6 +277,67 @@ const app = {
         }
     },
 
+    renderSectionScopes() {
+        const container = document.getElementById('sectionScopesDisplay');
+        if (!container) return;
+        
+        const allScopes = this.data.sectionScopes || {};
+        let sections = Object.keys(allScopes);
+        
+        // In contractor mode, only show their assigned sections
+        if (this.data.mode === 'contractor' && this.data.contractorSections && this.data.contractorSections.length) {
+            sections = sections.filter(s => this.data.contractorSections.includes(s));
+        }
+        
+        if (sections.length === 0) {
+            container.innerHTML = '<p style="color:#666">No section scopes yet.</p>';
+            return;
+        }
+        
+        // Helper to find contractor(s) assigned to a category
+        const getContractorsForCategory = (category) => {
+            const result = [];
+            const assignments = this.data.contractorAssignments || {};
+            Object.keys(assignments).forEach(name => {
+                if ((assignments[name] || []).includes(category)) {
+                    result.push(name);
+                }
+            });
+            return result;
+        };
+        
+        // Build sections styled like Line Items headers
+        container.innerHTML = '';
+        sections.forEach(sectionName => {
+            const scopeText = allScopes[sectionName];
+            if (!scopeText || !scopeText.trim()) return;
+            
+            const contractors = getContractorsForCategory(sectionName);
+            const contractorLabel = contractors.length
+                ? ` — ${contractors.join(', ')}`
+                : (this.data.mode === 'contractor' && this.data.contractorName ? ` — ${this.data.contractorName}` : '');
+            
+            const wrapper = document.createElement('div');
+            wrapper.className = 'category-section';
+            
+            const header = document.createElement('div');
+            header.className = 'category-header';
+            header.innerHTML = `
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <span>${sectionName}${contractorLabel}</span>
+                </div>
+            `;
+            
+            const body = document.createElement('div');
+            body.style.cssText = 'border:1px solid #dee2e6; border-top:none; border-radius:0 0 6px 6px; background:#fff; padding:15px;';
+            body.innerHTML = `<div style="white-space:pre-wrap; color:#333; line-height:1.6;">${scopeText}</div>`;
+            
+            wrapper.appendChild(header);
+            wrapper.appendChild(body);
+            container.appendChild(wrapper);
+        });
+    },
+
     addItem() {
         // Get the last item's category, or default to first category
         const lastCategory = this.data.items.length > 0 ? 
