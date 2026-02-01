@@ -42,7 +42,12 @@ const app = {
         } else if (dataParam) {
             this.loadFromURL();
         } else {
-            this.loadFromStorage();
+            // Try to load the most recent job from database
+            const loaded = await this.loadMostRecentJob();
+            if (!loaded) {
+                // Fall back to localStorage if no recent job found
+                this.loadFromStorage();
+            }
         }
         
         // Check for contractor mode AFTER loading data
@@ -254,6 +259,8 @@ const app = {
                     size: file.size,
                     data: e.target.result
                 });
+                console.log('File added:', file.name);
+                console.log('Total files now:', this.data.files.length);
                 this.renderFiles();
                 this.save();
             };
@@ -502,6 +509,9 @@ const app = {
 
     async saveToDatabase(showNotification = false) {
         try {
+            console.log('Saving to database...');
+            console.log('Files being saved:', this.data.files.length);
+            
             const method = this.data.id ? 'PUT' : 'POST';
             const url = this.data.id ? `/api/jobs/${this.data.id}` : '/api/jobs';
             
@@ -537,6 +547,26 @@ const app = {
         }
     },
 
+    async loadMostRecentJob() {
+        try {
+            const response = await fetch('/api/jobs');
+            const jobs = await response.json();
+            
+            if (jobs.length > 0) {
+                // Get the most recent job (they're already sorted by updated_at DESC)
+                const mostRecentJobId = jobs[0].id;
+                await this.loadFromDatabase(mostRecentJobId);
+                // Update URL to reflect the loaded job
+                window.history.replaceState({}, '', `/?jobId=${mostRecentJobId}`);
+                return true;
+            }
+            return false;
+        } catch (error) {
+            console.error('Error loading most recent job:', error);
+            return false;
+        }
+    },
+
     async loadFromDatabase(jobId) {
         try {
             const response = await fetch(`/api/jobs/${jobId}`);
@@ -561,6 +591,9 @@ const app = {
             this.data.sectionScopes = job.section_scopes || {};
             this.data.sectionDisclaimers = job.section_disclaimers || {};
             this.data.items = job.items || [];
+            
+            console.log('Loaded files from database:', this.data.files);
+            console.log('Files count:', this.data.files.length);
             
             this.populateForm();
             this.renderItems();
