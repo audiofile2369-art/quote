@@ -946,7 +946,7 @@ const app = {
         }).catch(() => {
             prompt('Copy this contractor URL:', url);
         });
-    }
+    },
     
     async sendBackToOwner() {
         // In contractor mode, persist changes to the database for the existing job
