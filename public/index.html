@@ -32,7 +32,7 @@
         <div class="tabs">
             <button class="tab active" onclick="app.switchTab('info')">Project Info</button>
             <button class="tab" onclick="app.switchTab('plans')">Site Plans & Files</button>
-            <button class="tab" onclick="app.switchTab('items')">Line Items</button>
+            <button class="tab" onclick="app.switchTab('items')">Equipment Packages</button>
             <button class="tab" onclick="app.switchTab('scope')">Scope of Work</button>
             <button class="tab" onclick="app.switchTab('disclaimers')">Disclaimers</button>
             <button class="tab" onclick="app.switchTab('summary')">Summary</button>
@@ -121,38 +121,11 @@
             </div>
         </div>
 
-        <!-- TAB: Line Items -->
+        <!-- TAB: Equipment Packages -->
         <div id="tab-items" class="tab-content">
-            <h2>Line Items</h2>
+            <h2>Equipment Packages</h2>
 
             <div id="categorySections"></div>
-        </div>
-
-        <!-- TAB: Line Items (OLD - REMOVE THIS) -->
-        <div id="tab-items-old" class="tab-content" style="display: none;">
-            <h2>Line Items</h2>
-            
-            <div class="info-banner">
-                <strong>💡 Tip:</strong> Export JSON to send to others for pricing, then import their updates to merge data.
-            </div>
-
-            <div class="table-container">
-                <table id="itemsTable">
-                    <thead>
-                        <tr>
-                            <th style="width: 40%;">Description</th>
-                            <th style="width: 100px;">QTY</th>
-                            <th style="width: 120px;">Unit Price</th>
-                            <th style="width: 120px;">Total</th>
-                            <th style="width: 60px;"></th>
-                        </tr>
-                    </thead>
-                    <tbody id="itemsBody">
-                    </tbody>
-                </table>
-            </div>
-
-            <button onclick="app.addItem()" class="btn btn-add">+ Add Line Item</button>
         </div>
 
         <!-- TAB: Summary -->

@@ -77,6 +77,55 @@ async function initDB() {
                 created_at TIMESTAMP DEFAULT NOW()
             )
         `);
+        
+        // Equipment package templates (predefined package types)
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS package_templates (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(255) UNIQUE NOT NULL,
+                sort_order INTEGER DEFAULT 0,
+                created_at TIMESTAMP DEFAULT NOW()
+            )
+        `);
+        
+        // Line item templates (master list of all line items with defaults)
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS line_item_templates (
+                id SERIAL PRIMARY KEY,
+                package_template_id INTEGER REFERENCES package_templates(id) ON DELETE SET NULL,
+                description TEXT NOT NULL,
+                default_qty DECIMAL(10,2) DEFAULT 1,
+                default_price DECIMAL(10,2) DEFAULT 0,
+                is_default_for_package BOOLEAN DEFAULT false,
+                created_at TIMESTAMP DEFAULT NOW(),
+                updated_at TIMESTAMP DEFAULT NOW()
+            )
+        `);
+        
+        // Seed default package templates if empty
+        const packageCount = await client.query('SELECT COUNT(*) FROM package_templates');
+        if (parseInt(packageCount.rows[0].count) === 0) {
+            const defaultPackages = [
+                'Forecourt Island Equipment',
+                'Forecourt Submerged Pump Package',
+                'Tank Equipment',
+                'Tank Monitor Package',
+                'Tank Specifications',
+                'Dispensers - Wayne Anthem',
+                'Dispensers - Gilbarco',
+                'Canopy Equipment'
+            ];
+            for (let i = 0; i < defaultPackages.length; i++) {
+                await client.query(
+                    'INSERT INTO package_templates (name, sort_order) VALUES ($1, $2)',
+                    [defaultPackages[i], i + 1]
+                );
+            }
+            console.log('✓ Default package templates seeded');
+            
+            // Seed default line items
+            await seedDefaultLineItems(client);
+        }
 
         console.log('✓ Database tables initialized');
     } catch (err) {
@@ -84,6 +133,100 @@ async function initDB() {
     } finally {
         client.release();
     }
+}
+
+async function seedDefaultLineItems(client) {
+    const defaultItems = [
+        // Forecourt Island Equipment
+        { package: 'Forecourt Island Equipment', description: '6" round X 7" long crash protector', qty: 12, price: 0, isDefault: true },
+        { package: 'Forecourt Island Equipment', description: 'Fiberglass Dispenser Sumps', qty: 3, price: 0, isDefault: true },
+        { package: 'Forecourt Island Equipment', description: 'Island Forms 3 X 8 X9 with 6"R', qty: 3, price: 0, isDefault: true },
+        { package: 'Forecourt Island Equipment', description: 'Stabilizer bar', qty: 8, price: 0, isDefault: true },
+        { package: 'Forecourt Island Equipment', description: 'flex connector 1 1/2" X 16"', qty: 8, price: 0, isDefault: true },
+        { package: 'Forecourt Island Equipment', description: 'Impact valve double poppet', qty: 8, price: 0, isDefault: true },
+        
+        // Forecourt Submerged Pump Package
+        { package: 'Forecourt Submerged Pump Package', description: 'OPW closed bottom fiberglass submerged pump sump', qty: 3, price: 0, isDefault: true },
+        { package: 'Forecourt Submerged Pump Package', description: 'Sump mounting flange', qty: 3, price: 0, isDefault: true },
+        { package: 'Forecourt Submerged Pump Package', description: '42" round manhole Matador', qty: 3, price: 0, isDefault: true },
+        { package: 'Forecourt Submerged Pump Package', description: '1 1/2 HP sub pump (Regular/Premium/Diesel)', qty: 3, price: 0, isDefault: true },
+        { package: 'Forecourt Submerged Pump Package', description: 'Gasoline DPLLD with SwiftCheck Valve', qty: 2, price: 0, isDefault: true },
+        { package: 'Forecourt Submerged Pump Package', description: 'Diesel DPLLD with SwiftCheck Valve', qty: 1, price: 0, isDefault: true },
+        { package: 'Forecourt Submerged Pump Package', description: 'Relay w/ hook box', qty: 3, price: 0, isDefault: true },
+        { package: 'Forecourt Submerged Pump Package', description: '2" ball valve', qty: 3, price: 0, isDefault: true },
+        { package: 'Forecourt Submerged Pump Package', description: '2" X 16" flex connector', qty: 3, price: 0, isDefault: true },
+        
+        // Tank Equipment
+        { package: 'Tank Equipment', description: 'Spill containment manhole', qty: 3, price: 0, isDefault: true },
+        { package: 'Tank Equipment', description: '10" overfill drop tube', qty: 3, price: 0, isDefault: true },
+        { package: 'Tank Equipment', description: '4" fill adaptor w/swivel', qty: 2, price: 0, isDefault: true },
+        { package: 'Tank Equipment', description: '4" adaptor standard', qty: 1, price: 0, isDefault: true },
+        { package: 'Tank Equipment', description: '4" fill cap', qty: 3, price: 0, isDefault: true },
+        { package: 'Tank Equipment', description: 'EVR vapor adaptor manhole', qty: 1, price: 0, isDefault: true },
+        { package: 'Tank Equipment', description: 'EVR vapor swivel adaptor', qty: 1, price: 0, isDefault: true },
+        { package: 'Tank Equipment', description: 'EVR adaptor cap', qty: 1, price: 0, isDefault: true },
+        { package: 'Tank Equipment', description: 'Extractor valve', qty: 3, price: 0, isDefault: true },
+        { package: 'Tank Equipment', description: 'Face seal adaptor', qty: 2, price: 0, isDefault: true },
+        { package: 'Tank Equipment', description: '2" EVR vent cap', qty: 2, price: 0, isDefault: true },
+        { package: 'Tank Equipment', description: 'Aluminum vent cap', qty: 1, price: 0, isDefault: true },
+        { package: 'Tank Equipment', description: 'Probe manhole', qty: 3, price: 0, isDefault: true },
+        { package: 'Tank Equipment', description: 'Interstitial Manhole', qty: 1, price: 0, isDefault: true },
+        { package: 'Tank Equipment', description: 'Monitor Well Manhole', qty: 2, price: 0, isDefault: true },
+        
+        // Tank Monitor Package
+        { package: 'Tank Monitor Package', description: 'TLS-450PLUS Console (Dual USB, RS-232/RS-485)', qty: 1, price: 0, isDefault: true },
+        { package: 'Tank Monitor Package', description: 'TLS450PLUS Application Software', qty: 1, price: 0, isDefault: true },
+        { package: 'Tank Monitor Package', description: 'Universal Sensor/Probe Interface Module', qty: 1, price: 0, isDefault: true },
+        { package: 'Tank Monitor Package', description: 'Universal Input/Output Interface Module (UIOM)', qty: 1, price: 0, isDefault: true },
+        { package: 'Tank Monitor Package', description: 'Base Compliance DPLLD Software', qty: 1, price: 0, isDefault: true },
+        { package: 'Tank Monitor Package', description: 'SS Probe 0.2 MAG Plus Water Detection - 10 ft', qty: 3, price: 0, isDefault: true },
+        { package: 'Tank Monitor Package', description: 'Install Kit - MAG Probe (Gas Phase Separator/Water Detector)', qty: 2, price: 0, isDefault: true },
+        { package: 'Tank Monitor Package', description: 'Install Kit - MAG Plus Diesel', qty: 1, price: 0, isDefault: true },
+        { package: 'Tank Monitor Package', description: 'Sump Sensor (Piping, 12ft Cable)', qty: 6, price: 0, isDefault: true },
+        { package: 'Tank Monitor Package', description: 'Interstitial Sensor - Steel Tank (4-12ft)', qty: 1, price: 0, isDefault: true },
+        { package: 'Tank Monitor Package', description: 'TLS450+ Continuous Statistical Leak Detection (CSLD)', qty: 1, price: 0, isDefault: true },
+        
+        // Tank Specifications
+        { package: 'Tank Specifications', description: '25,000 gallon ELUTRON double wall underground tank', qty: 1, price: 0, isDefault: true },
+        { package: 'Tank Specifications', description: 'Add to above for tie-down straps', qty: 7, price: 0, isDefault: true },
+        { package: 'Tank Specifications', description: 'Add to above for turnbuckles', qty: 14, price: 0, isDefault: true },
+        
+        // Dispensers - Wayne Anthem
+        { package: 'Dispensers - Wayne Anthem', description: 'DUAL Passport POS terminal (2 servers, scanners, PIN pads)', qty: 1, price: 0, isDefault: true },
+        { package: 'Dispensers - Wayne Anthem', description: 'Universal D-Box (for Wayne Anthems)', qty: 1, price: 0, isDefault: true },
+        { package: 'Dispensers - Wayne Anthem', description: 'Wayne Anthem Model B23/4 (four grade blending, diesel)', qty: 1, price: 0, isDefault: true },
+        { package: 'Dispensers - Wayne Anthem', description: 'Wayne Anthem Model B12/3 (four grade blending)', qty: 1, price: 0, isDefault: true },
+        { package: 'Dispensers - Wayne Anthem', description: 'DX Promote annual contract', qty: 1, price: 0, isDefault: true },
+        { package: 'Dispensers - Wayne Anthem', description: 'Additional warranty (years 4-5)', qty: 1, price: 0, isDefault: true },
+        { package: 'Dispensers - Wayne Anthem', description: 'Unbranded valances', qty: 1, price: 0, isDefault: true },
+        { package: 'Dispensers - Wayne Anthem', description: 'OPW Hanging Hardware (Unleaded/Premium)', qty: 1, price: 0, isDefault: true },
+        { package: 'Dispensers - Wayne Anthem', description: 'OPW Hanging Hardware (Diesel)', qty: 1, price: 0, isDefault: true },
+        { package: 'Dispensers - Wayne Anthem', description: 'POS Installation and commissioning', qty: 1, price: 0, isDefault: true },
+        
+        // Dispensers - Gilbarco
+        { package: 'Dispensers - Gilbarco', description: 'DUAL Passport POS terminal', qty: 1, price: 0, isDefault: true },
+        { package: 'Dispensers - Gilbarco', description: 'Gilbarco Encore Model E700 3+1 (four grade, diesel, Flexpay 6)', qty: 1, price: 0, isDefault: true },
+        { package: 'Dispensers - Gilbarco', description: 'Gilbarco Encore Model E700 3+0 (three grade, Flexpay 6)', qty: 1, price: 0, isDefault: true },
+        { package: 'Dispensers - Gilbarco', description: 'OPW Hanging Hardware (Unleaded/Premium)', qty: 1, price: 0, isDefault: true },
+        { package: 'Dispensers - Gilbarco', description: 'OPW Hanging Hardware (Diesel)', qty: 1, price: 0, isDefault: true },
+        
+        // Canopy Equipment
+        { package: 'Canopy Equipment', description: 'Canopy Structure (specify dimensions)', qty: 1, price: 0, isDefault: true },
+        { package: 'Canopy Equipment', description: 'LED Lighting Package', qty: 1, price: 0, isDefault: true },
+        { package: 'Canopy Equipment', description: 'Fascia/Signage', qty: 1, price: 0, isDefault: true },
+        { package: 'Canopy Equipment', description: 'Canopy Installation', qty: 1, price: 0, isDefault: true }
+    ];
+    
+    for (const item of defaultItems) {
+        const pkgResult = await client.query('SELECT id FROM package_templates WHERE name = $1', [item.package]);
+        if (pkgResult.rows.length > 0) {
+            await client.query(`
+                INSERT INTO line_item_templates (package_template_id, description, default_qty, default_price, is_default_for_package)
+                VALUES ($1, $2, $3, $4, $5)
+            `, [pkgResult.rows[0].id, item.description, item.qty, item.price, item.isDefault]);
+        }
+    }
+    console.log('✓ Default line items seeded');
 }
 
 initDB();
@@ -307,6 +450,163 @@ app.delete('/api/jobs/:id', async (req, res) => {
     } catch (err) {
         console.error('Error deleting job:', err);
         res.status(500).json({ error: 'Failed to delete job' });
+    }
+});
+
+// ============ PACKAGE TEMPLATES API ============
+
+// Get all package templates
+app.get('/api/package-templates', async (req, res) => {
+    try {
+        const result = await pool.query('SELECT * FROM package_templates ORDER BY sort_order, name');
+        res.json(result.rows);
+    } catch (err) {
+        console.error('Error fetching package templates:', err);
+        res.status(500).json({ error: 'Failed to fetch package templates' });
+    }
+});
+
+// Create package template
+app.post('/api/package-templates', async (req, res) => {
+    try {
+        const { name, sort_order } = req.body;
+        const result = await pool.query(
+            'INSERT INTO package_templates (name, sort_order) VALUES ($1, $2) RETURNING *',
+            [name, sort_order || 999]
+        );
+        res.json(result.rows[0]);
+    } catch (err) {
+        console.error('Error creating package template:', err);
+        res.status(500).json({ error: 'Failed to create package template' });
+    }
+});
+
+// Update package template
+app.put('/api/package-templates/:id', async (req, res) => {
+    try {
+        const { name, sort_order } = req.body;
+        const result = await pool.query(
+            'UPDATE package_templates SET name = $1, sort_order = $2 WHERE id = $3 RETURNING *',
+            [name, sort_order, req.params.id]
+        );
+        res.json(result.rows[0]);
+    } catch (err) {
+        console.error('Error updating package template:', err);
+        res.status(500).json({ error: 'Failed to update package template' });
+    }
+});
+
+// Delete package template
+app.delete('/api/package-templates/:id', async (req, res) => {
+    try {
+        await pool.query('DELETE FROM package_templates WHERE id = $1', [req.params.id]);
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error deleting package template:', err);
+        res.status(500).json({ error: 'Failed to delete package template' });
+    }
+});
+
+// ============ LINE ITEM TEMPLATES API ============
+
+// Get all line item templates (optionally filtered by package)
+app.get('/api/line-item-templates', async (req, res) => {
+    try {
+        const { package_id } = req.query;
+        let query = `
+            SELECT lit.*, pt.name as package_name 
+            FROM line_item_templates lit
+            LEFT JOIN package_templates pt ON lit.package_template_id = pt.id
+        `;
+        const params = [];
+        
+        if (package_id) {
+            query += ' WHERE lit.package_template_id = $1';
+            params.push(package_id);
+        }
+        
+        query += ' ORDER BY pt.sort_order, lit.description';
+        
+        const result = await pool.query(query, params);
+        res.json(result.rows);
+    } catch (err) {
+        console.error('Error fetching line item templates:', err);
+        res.status(500).json({ error: 'Failed to fetch line item templates' });
+    }
+});
+
+// Search line item templates (for autocomplete)
+app.get('/api/line-item-templates/search', async (req, res) => {
+    try {
+        const { q } = req.query;
+        const result = await pool.query(`
+            SELECT DISTINCT description, default_qty, default_price
+            FROM line_item_templates
+            WHERE description ILIKE $1
+            ORDER BY description
+            LIMIT 20
+        `, [`%${q}%`]);
+        res.json(result.rows);
+    } catch (err) {
+        console.error('Error searching line items:', err);
+        res.status(500).json({ error: 'Failed to search line items' });
+    }
+});
+
+// Create line item template
+app.post('/api/line-item-templates', async (req, res) => {
+    try {
+        const { package_template_id, description, default_qty, default_price, is_default_for_package } = req.body;
+        const result = await pool.query(`
+            INSERT INTO line_item_templates (package_template_id, description, default_qty, default_price, is_default_for_package)
+            VALUES ($1, $2, $3, $4, $5) RETURNING *
+        `, [package_template_id, description, default_qty || 1, default_price || 0, is_default_for_package || false]);
+        res.json(result.rows[0]);
+    } catch (err) {
+        console.error('Error creating line item template:', err);
+        res.status(500).json({ error: 'Failed to create line item template' });
+    }
+});
+
+// Update line item template
+app.put('/api/line-item-templates/:id', async (req, res) => {
+    try {
+        const { package_template_id, description, default_qty, default_price, is_default_for_package } = req.body;
+        const result = await pool.query(`
+            UPDATE line_item_templates 
+            SET package_template_id = $1, description = $2, default_qty = $3, default_price = $4, is_default_for_package = $5, updated_at = NOW()
+            WHERE id = $6 RETURNING *
+        `, [package_template_id, description, default_qty, default_price, is_default_for_package, req.params.id]);
+        res.json(result.rows[0]);
+    } catch (err) {
+        console.error('Error updating line item template:', err);
+        res.status(500).json({ error: 'Failed to update line item template' });
+    }
+});
+
+// Delete line item template
+app.delete('/api/line-item-templates/:id', async (req, res) => {
+    try {
+        await pool.query('DELETE FROM line_item_templates WHERE id = $1', [req.params.id]);
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error deleting line item template:', err);
+        res.status(500).json({ error: 'Failed to delete line item template' });
+    }
+});
+
+// Get default line items for a specific package (for Add Package modal)
+app.get('/api/package-templates/:id/line-items', async (req, res) => {
+    try {
+        const result = await pool.query(`
+            SELECT * FROM line_item_templates 
+            WHERE package_template_id = $1 
+            ORDER BY is_default_for_package DESC, description
+        `, [req.params.id]);
+        res.json(result.rows);
+    } catch (err) {
+        console.error('Error fetching package line items:', err);
+        res.status(500).json({ error: 'Failed to fetch package line items' });
     }
 });
 

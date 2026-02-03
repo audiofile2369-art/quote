@@ -18,14 +18,18 @@ const app = {
         paymentTerms: '',
         scopeOfWork: '',
         disclaimers: '',
-        sectionScopes: {}, // { 'category': 'scope text' }
-        sectionDisclaimers: {}, // { 'category': 'disclaimer text' }
-        contractorAssignments: {}, // { 'contractorName': ['Section A', 'Section B'] }
+        sectionScopes: {}, // { 'package': 'scope text' }
+        sectionDisclaimers: {}, // { 'package': 'disclaimer text' }
+        contractorAssignments: {}, // { 'contractorName': ['Package A', 'Package B'] }
         mode: 'owner', // 'owner' or 'contractor'
         contractorName: null, // contractor viewing this
-        contractorSection: null, // which section the contractor can edit (deprecated)
-        contractorSections: [] // multiple sections for contractor (deprecated)
+        contractorSection: null, // which package the contractor can edit (deprecated)
+        contractorSections: [] // multiple packages for contractor
     },
+    
+    // Cache for templates
+    packageTemplates: [],
+    lineItemTemplates: [],
     
     saveTimeout: null, // For debouncing auto-saves
 
@@ -95,10 +99,8 @@ const app = {
         this.renderFiles();
         this.calculateTotals();
         
-        // If no items, add defaults
-        if (this.data.items.length === 0) {
-            this.loadDefaultItems();
-        }
+        // Load package templates for Add Package modal
+        this.loadPackageTemplates();
     },
     
     resetForNewJob() {
@@ -137,11 +139,11 @@ const app = {
         };
         
         this.populateForm();
-        this.loadDefaultItems();
+        // Don't load default items for new jobs - user will add packages manually
         this.renderItems();
         this.renderFiles();
         this.calculateTotals();
-        this.showNotification('✨ New job created! Fill in the details and save.');
+        this.showNotification('✨ New job created! Add equipment packages to get started.');
     },
     
     applyModeRestrictions() {
@@ -199,91 +201,197 @@ const app = {
         }
     },
 
-    loadDefaultItems() {
-        const defaults = [
-            // A. FORECOURT ISLAND EQUIPMENT
-            { category: 'A. Forecourt Island Equipment', description: '6" round X 7" long crash protector', qty: 12, price: 0 },
-            { category: 'A. Forecourt Island Equipment', description: 'Fiberglass Dispenser Sumps', qty: 3, price: 0 },
-            { category: 'A. Forecourt Island Equipment', description: 'Island Forms 3 X 8 X9 with 6"R', qty: 3, price: 0 },
-            { category: 'A. Forecourt Island Equipment', description: 'Stabilizer bar', qty: 8, price: 0 },
-            { category: 'A. Forecourt Island Equipment', description: 'flex connector 1 1/2" X 16"', qty: 8, price: 0 },
-            { category: 'A. Forecourt Island Equipment', description: 'Impact valve double poppet', qty: 8, price: 0 },
-            
-            // B. FORECOURT SUBMERGED PUMP PACKAGE
-            { category: 'B. Forecourt Submerged Pump Package', description: 'OPW closed bottom fiberglass submerged pump sump', qty: 3, price: 0 },
-            { category: 'B. Forecourt Submerged Pump Package', description: 'Sump mounting flange', qty: 3, price: 0 },
-            { category: 'B. Forecourt Submerged Pump Package', description: '42" round manhole Matador', qty: 3, price: 0 },
-            { category: 'B. Forecourt Submerged Pump Package', description: '1 1/2 HP sub pump (Regular/Premium/Diesel)', qty: 3, price: 0 },
-            { category: 'B. Forecourt Submerged Pump Package', description: 'Gasoline DPLLD with SwiftCheck Valve', qty: 2, price: 0 },
-            { category: 'B. Forecourt Submerged Pump Package', description: 'Diesel DPLLD with SwiftCheck Valve', qty: 1, price: 0 },
-            { category: 'B. Forecourt Submerged Pump Package', description: 'Relay w/ hook box', qty: 3, price: 0 },
-            { category: 'B. Forecourt Submerged Pump Package', description: '2" ball valve', qty: 3, price: 0 },
-            { category: 'B. Forecourt Submerged Pump Package', description: '2" X 16" flex connector', qty: 3, price: 0 },
-            
-            // C. TANK EQUIPMENT
-            { category: 'C. Tank Equipment', description: 'Spill containment manhole', qty: 3, price: 0 },
-            { category: 'C. Tank Equipment', description: '10" overfill drop tube', qty: 3, price: 0 },
-            { category: 'C. Tank Equipment', description: '4" fill adaptor w/swivel', qty: 2, price: 0 },
-            { category: 'C. Tank Equipment', description: '4" adaptor standard', qty: 1, price: 0 },
-            { category: 'C. Tank Equipment', description: '4" fill cap', qty: 3, price: 0 },
-            { category: 'C. Tank Equipment', description: 'EVR vapor adaptor manhole', qty: 1, price: 0 },
-            { category: 'C. Tank Equipment', description: 'EVR vapor swivel adaptor', qty: 1, price: 0 },
-            { category: 'C. Tank Equipment', description: 'EVR adaptor cap', qty: 1, price: 0 },
-            { category: 'C. Tank Equipment', description: 'Extractor valve', qty: 3, price: 0 },
-            { category: 'C. Tank Equipment', description: 'Face seal adaptor', qty: 2, price: 0 },
-            { category: 'C. Tank Equipment', description: '2" EVR vent cap', qty: 2, price: 0 },
-            { category: 'C. Tank Equipment', description: 'Aluminum vent cap', qty: 1, price: 0 },
-            { category: 'C. Tank Equipment', description: 'Probe manhole', qty: 3, price: 0 },
-            { category: 'C. Tank Equipment', description: 'Interstitial Manhole', qty: 1, price: 0 },
-            { category: 'C. Tank Equipment', description: 'Monitor Well Manhole', qty: 2, price: 0 },
-            
-            // D. TANK MONITOR PACKAGE
-            { category: 'D. Tank Monitor Package', description: 'TLS-450PLUS Console (Dual USB, RS-232/RS-485)', qty: 1, price: 0 },
-            { category: 'D. Tank Monitor Package', description: 'TLS450PLUS Application Software', qty: 1, price: 0 },
-            { category: 'D. Tank Monitor Package', description: 'Universal Sensor/Probe Interface Module', qty: 1, price: 0 },
-            { category: 'D. Tank Monitor Package', description: 'Universal Input/Output Interface Module (UIOM)', qty: 1, price: 0 },
-            { category: 'D. Tank Monitor Package', description: 'Base Compliance DPLLD Software', qty: 1, price: 0 },
-            { category: 'D. Tank Monitor Package', description: 'SS Probe 0.2 MAG Plus Water Detection - 10 ft', qty: 3, price: 0 },
-            { category: 'D. Tank Monitor Package', description: 'Install Kit - MAG Probe (Gas Phase Separator/Water Detector)', qty: 2, price: 0 },
-            { category: 'D. Tank Monitor Package', description: 'Install Kit - MAG Plus Diesel', qty: 1, price: 0 },
-            { category: 'D. Tank Monitor Package', description: 'Sump Sensor (Piping, 12ft Cable)', qty: 6, price: 0 },
-            { category: 'D. Tank Monitor Package', description: 'Interstitial Sensor - Steel Tank (4-12ft)', qty: 1, price: 0 },
-            { category: 'D. Tank Monitor Package', description: 'TLS450+ Continuous Statistical Leak Detection (CSLD)', qty: 1, price: 0 },
-            
-            // E. TANK SPECIFICATIONS
-            { category: 'E. Tank Specifications', description: '25,000 gallon ELUTRON double wall underground tank. 10" dia. x 42.5" long. 3-compartment construction- SPLIT 5/15/5. Each compartment includes (5) 4" FNPT fittings. (1) 2" FNPT interstitial monitor port.', qty: 1, price: 0 },
-            { category: 'E. Tank Specifications', description: 'Add to above for tie-down straps', qty: 7, price: 0 },
-            { category: 'E. Tank Specifications', description: 'Add to above for turnbuckles', qty: 14, price: 0 },
-            
-            // F. DISPENSERS - WAYNE ANTHEM
-            { category: 'F. Dispensers - Wayne Anthem', description: 'DUAL Passport POS terminal (2 servers, scanners, PIN pads)', qty: 1, price: 0 },
-            { category: 'F. Dispensers - Wayne Anthem', description: 'Universal D-Box (for Wayne Anthems)', qty: 1, price: 0 },
-            { category: 'F. Dispensers - Wayne Anthem', description: 'Wayne Anthem Model B23/4 (four grade blending, diesel)', qty: 1, price: 0 },
-            { category: 'F. Dispensers - Wayne Anthem', description: 'Wayne Anthem Model B12/3 (four grade blending)', qty: 1, price: 0 },
-            { category: 'F. Dispensers - Wayne Anthem', description: 'DX Promote annual contract', qty: 1, price: 0 },
-            { category: 'F. Dispensers - Wayne Anthem', description: 'Additional warranty (years 4-5)', qty: 1, price: 0 },
-            { category: 'F. Dispensers - Wayne Anthem', description: 'Unbranded valances', qty: 1, price: 0 },
-            { category: 'F. Dispensers - Wayne Anthem', description: 'OPW Hanging Hardware (Unleaded/Premium)', qty: 1, price: 0 },
-            { category: 'F. Dispensers - Wayne Anthem', description: 'OPW Hanging Hardware (Diesel)', qty: 1, price: 0 },
-            { category: 'F. Dispensers - Wayne Anthem', description: 'POS Installation and commissioning', qty: 1, price: 0 },
-            
-            // G. DISPENSERS - GILBARCO
-            { category: 'G. Dispensers - Gilbarco', description: 'DUAL Passport POS terminal', qty: 1, price: 0 },
-            { category: 'G. Dispensers - Gilbarco', description: 'Gilbarco Encore Model E700 3+1 (four grade, diesel, Flexpay 6)', qty: 1, price: 0 },
-            { category: 'G. Dispensers - Gilbarco', description: 'Gilbarco Encore Model E700 3+0 (three grade, Flexpay 6)', qty: 1, price: 0 },
-            { category: 'G. Dispensers - Gilbarco', description: 'OPW Hanging Hardware (Unleaded/Premium)', qty: 1, price: 0 },
-            { category: 'G. Dispensers - Gilbarco', description: 'OPW Hanging Hardware (Diesel)', qty: 1, price: 0 },
-            
-            // H. CANOPY EQUIPMENT
-            { category: 'H. Canopy Equipment', description: 'Canopy Structure (specify dimensions)', qty: 1, price: 0 },
-            { category: 'H. Canopy Equipment', description: 'LED Lighting Package', qty: 1, price: 0 },
-            { category: 'H. Canopy Equipment', description: 'Fascia/Signage', qty: 1, price: 0 },
-            { category: 'H. Canopy Equipment', description: 'Canopy Installation', qty: 1, price: 0 }
-        ];
+    // Load package templates from database
+    async loadPackageTemplates() {
+        try {
+            const response = await fetch('/api/package-templates');
+            if (response.ok) {
+                this.packageTemplates = await response.json();
+            }
+        } catch (err) {
+            console.error('Error loading package templates:', err);
+        }
+    },
+    
+    // Show Add Equipment Package modal
+    async showAddPackageModal() {
+        // Ensure templates are loaded
+        if (this.packageTemplates.length === 0) {
+            await this.loadPackageTemplates();
+        }
         
-        this.data.items = defaults;
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.id = 'addPackageModal';
+        
+        let packageOptions = '<option value="">-- Select Equipment Package --</option>';
+        this.packageTemplates.forEach(pkg => {
+            packageOptions += `<option value="${pkg.id}">${pkg.name}</option>`;
+        });
+        packageOptions += '<option value="custom">+ Custom Package</option>';
+        
+        modal.innerHTML = `
+            <div class="modal-content" style="max-width: 700px; max-height: 80vh; overflow-y: auto;">
+                <h3 style="color: #3b82f6; margin-bottom: 20px;">➕ Add Equipment Package</h3>
+                
+                <div style="margin-bottom: 20px;">
+                    <label style="font-weight: 600; display: block; margin-bottom: 8px;">Package Type:</label>
+                    <select id="packageSelect" onchange="app.onPackageSelect(this.value)" style="width: 100%; padding: 12px; border: 1px solid #dee2e6; border-radius: 6px; font-size: 15px;">
+                        ${packageOptions}
+                    </select>
+                </div>
+                
+                <div id="customPackageName" style="display: none; margin-bottom: 20px;">
+                    <label style="font-weight: 600; display: block; margin-bottom: 8px;">Custom Package Name:</label>
+                    <input type="text" id="customPackageInput" placeholder="Enter package name..." style="width: 100%; padding: 12px; border: 1px solid #dee2e6; border-radius: 6px; font-size: 15px;">
+                </div>
+                
+                <div id="lineItemsSection" style="display: none;">
+                    <label style="font-weight: 600; display: block; margin-bottom: 8px;">Select Line Items to Include:</label>
+                    <div style="margin-bottom: 10px;">
+                        <label style="cursor: pointer; color: #3b82f6;">
+                            <input type="checkbox" id="selectAllLineItems" onchange="app.toggleAllLineItems(this.checked)"> Select All Default Items
+                        </label>
+                    </div>
+                    <div id="lineItemsList" style="max-height: 300px; overflow-y: auto; border: 1px solid #dee2e6; border-radius: 6px; padding: 10px;">
+                        <p style="color: #999; text-align: center;">Select a package to see available line items</p>
+                    </div>
+                </div>
+                
+                <div style="margin-top: 25px; display: flex; gap: 10px; justify-content: flex-end;">
+                    <button onclick="app.closeModal()" class="btn" style="background: #6c757d;">Cancel</button>
+                    <button onclick="app.addSelectedPackage()" class="btn" style="background: linear-gradient(135deg, #3b82f6, #2563eb);">Add Package</button>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(modal);
+        setTimeout(() => modal.classList.add('show'), 10);
+    },
+    
+    // Handle package selection in modal
+    async onPackageSelect(packageId) {
+        const customNameDiv = document.getElementById('customPackageName');
+        const lineItemsSection = document.getElementById('lineItemsSection');
+        const lineItemsList = document.getElementById('lineItemsList');
+        
+        if (packageId === 'custom') {
+            customNameDiv.style.display = 'block';
+            lineItemsSection.style.display = 'none';
+            return;
+        }
+        
+        if (!packageId) {
+            customNameDiv.style.display = 'none';
+            lineItemsSection.style.display = 'none';
+            return;
+        }
+        
+        customNameDiv.style.display = 'none';
+        lineItemsSection.style.display = 'block';
+        lineItemsList.innerHTML = '<p style="text-align: center; color: #999;">Loading line items...</p>';
+        
+        try {
+            const response = await fetch(`/api/package-templates/${packageId}/line-items`);
+            const items = await response.json();
+            
+            if (items.length === 0) {
+                lineItemsList.innerHTML = '<p style="color: #999; text-align: center;">No default line items for this package</p>';
+                return;
+            }
+            
+            let html = '';
+            items.forEach(item => {
+                html += `
+                    <div style="display: flex; align-items: center; gap: 10px; padding: 10px; border-bottom: 1px solid #f0f0f0;">
+                        <input type="checkbox" class="line-item-checkbox" data-id="${item.id}" data-desc="${item.description.replace(/"/g, '&quot;')}" data-qty="${item.default_qty}" data-price="${item.default_price}" ${item.is_default_for_package ? 'checked' : ''}>
+                        <div style="flex: 1;">
+                            <div style="font-weight: 500;">${item.description}</div>
+                            <div style="font-size: 12px; color: #666;">Qty: ${item.default_qty} | Price: $${parseFloat(item.default_price || 0).toFixed(2)}</div>
+                        </div>
+                    </div>
+                `;
+            });
+            lineItemsList.innerHTML = html;
+            
+            // Update select all checkbox state
+            this.updateSelectAllState();
+            
+        } catch (err) {
+            lineItemsList.innerHTML = '<p style="color: #dc3545; text-align: center;">Error loading line items</p>';
+        }
+    },
+    
+    toggleAllLineItems(checked) {
+        document.querySelectorAll('.line-item-checkbox').forEach(cb => cb.checked = checked);
+    },
+    
+    updateSelectAllState() {
+        const checkboxes = document.querySelectorAll('.line-item-checkbox');
+        const selectAll = document.getElementById('selectAllLineItems');
+        if (selectAll && checkboxes.length > 0) {
+            const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+            selectAll.checked = allChecked;
+        }
+    },
+    
+    // Add the selected package with line items to the job
+    addSelectedPackage() {
+        const packageSelect = document.getElementById('packageSelect');
+        const customInput = document.getElementById('customPackageInput');
+        
+        let packageName = '';
+        
+        if (packageSelect.value === 'custom') {
+            packageName = customInput.value.trim();
+            if (!packageName) {
+                alert('Please enter a package name');
+                return;
+            }
+        } else if (packageSelect.value) {
+            packageName = packageSelect.options[packageSelect.selectedIndex].text;
+        } else {
+            alert('Please select a package type');
+            return;
+        }
+        
+        // Check if this package already exists in the job
+        const existingPackages = [...new Set(this.data.items.map(i => i.category))];
+        if (existingPackages.includes(packageName)) {
+            if (!confirm(`"${packageName}" already exists in this job. Add another one?`)) {
+                return;
+            }
+        }
+        
+        // Get selected line items
+        const selectedItems = [];
+        document.querySelectorAll('.line-item-checkbox:checked').forEach(cb => {
+            selectedItems.push({
+                category: packageName,
+                description: cb.dataset.desc,
+                qty: parseFloat(cb.dataset.qty) || 1,
+                price: parseFloat(cb.dataset.price) || 0
+            });
+        });
+        
+        // If custom or no items selected, add one empty item
+        if (selectedItems.length === 0) {
+            selectedItems.push({
+                category: packageName,
+                description: '',
+                qty: 1,
+                price: 0
+            });
+        }
+        
+        // Add items to job
+        this.data.items.push(...selectedItems);
+        
+        this.closeModal();
         this.renderItems();
+        this.calculateTotals();
         this.save();
+        this.showNotification(`✓ Added "${packageName}" with ${selectedItems.length} item${selectedItems.length > 1 ? 's' : ''}`);
     },
 
     switchTab(tabName) {
@@ -518,17 +626,33 @@ const app = {
         
         container.innerHTML = '';
         
-        // Owner mode: Select All checkbox bar
+        // Check if there are no items - show empty state
+        if (this.data.items.length === 0 && this.data.mode !== 'contractor') {
+            container.innerHTML = `
+                <div style="text-align: center; padding: 60px 20px; background: #f8f9fa; border-radius: 12px; border: 2px dashed #dee2e6;">
+                    <div style="font-size: 48px; margin-bottom: 15px;">📦</div>
+                    <h3 style="color: #495057; margin-bottom: 10px;">No Equipment Packages Yet</h3>
+                    <p style="color: #6c757d; margin-bottom: 25px;">Start building your quote by adding equipment packages to this job.</p>
+                    <button onclick="app.showAddPackageModal()" class="btn" style="background: linear-gradient(135deg, #3b82f6, #2563eb); color: white; border: none; padding: 15px 30px; font-size: 16px; border-radius: 8px; cursor: pointer; font-weight: 600;">
+                        ➕ Add Equipment Package
+                    </button>
+                </div>
+            `;
+            return;
+        }
+        
+        // Owner mode: Select All checkbox bar and Add Package button
         if (this.data.mode !== 'contractor') {
             const selectAllBar = document.createElement('div');
             selectAllBar.style.cssText = 'display:flex; align-items:center; gap:10px; padding:10px; background:#f8f9fa; border:1px solid #dee2e6; border-radius:6px; margin-bottom:10px;';
             selectAllBar.innerHTML = `
                 <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
                     <input type="checkbox" id="selectAllSections" style="width:18px; height:18px;"> 
-                    <span style="font-weight:600; color:#495057;">Select All Sections</span>
+                    <span style="font-weight:600; color:#495057;">Select All Packages</span>
                 </label>
                 <div style="flex:1"></div>
-                <button class="btn-add-section" style="background:#007bff;" onclick="app.sendSelectedSectionsToContractor()">📤 Send Selected Sections to Contractor</button>`;
+                <button class="btn-add-section" style="background:#28a745; margin-right:10px;" onclick="app.showAddPackageModal()">➕ Add Equipment Package</button>
+                <button class="btn-add-section" style="background:#007bff;" onclick="app.sendSelectedSectionsToContractor()">📤 Send Selected to Contractor</button>`;
             container.appendChild(selectAllBar);
         }
         
@@ -566,7 +690,7 @@ const app = {
                     ${this.data.mode !== 'contractor' ? `<button class="btn-header" onclick="app.sendSectionToContractor('${category}')">📤 Send to Contractor</button>` : ''}
                     <button class="btn-header" onclick="app.editSectionScope('${category}')">📋 Scope of Work</button>
                     <button class="btn-header" onclick="app.editSectionDisclaimers('${category}')">⚠️ Disclaimers</button>
-                    ${this.data.mode !== 'contractor' ? `<button class="btn-header btn-delete-section" onclick="app.deleteSection('${category}')">🗑️ Delete Section</button>` : ''}
+                    ${this.data.mode !== 'contractor' ? `<button class="btn-header btn-delete-section" onclick="app.deleteSection('${category}')">🗑️ Delete Package</button>` : ''}
                 </div>
             `;
             section.appendChild(header);
@@ -644,18 +768,19 @@ const app = {
             buttonContainer.style.display = 'flex';
             buttonContainer.style.gap = '10px';
             
+            const addPackageBtn = document.createElement('button');
+            addPackageBtn.className = 'btn-add-section';
+            addPackageBtn.style.background = '#28a745';
+            addPackageBtn.textContent = '➕ Add Equipment Package';
+            addPackageBtn.onclick = () => this.showAddPackageModal();
+            buttonContainer.appendChild(addPackageBtn);
+            
             const sendSelectedBtn = document.createElement('button');
             sendSelectedBtn.className = 'btn-add-section';
             sendSelectedBtn.style.background = '#007bff';
-            sendSelectedBtn.textContent = '📤 Send Selected Sections to Contractor';
+            sendSelectedBtn.textContent = '📤 Send Selected to Contractor';
             sendSelectedBtn.onclick = () => this.sendSelectedSectionsToContractor();
             buttonContainer.appendChild(sendSelectedBtn);
-            
-            const newSectionBtn = document.createElement('button');
-            newSectionBtn.className = 'btn-add-section';
-            newSectionBtn.textContent = '+ Add New Section';
-            newSectionBtn.onclick = () => this.addNewSection();
-            buttonContainer.appendChild(newSectionBtn);
             
             container.appendChild(buttonContainer);
             
