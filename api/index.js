@@ -108,9 +108,8 @@ async function initDB() {
             const defaultPackages = [
                 'Forecourt Island Equipment',
                 'Forecourt Submerged Pump Package',
-                'Tank Equipment',
+                'Tank and Equipment',
                 'Tank Monitor Package',
-                'Tank Specifications',
                 'Dispensers - Wayne Anthem',
                 'Dispensers - Gilbarco',
                 'Canopy Equipment'
@@ -130,9 +129,8 @@ async function initDB() {
             const requiredPackages = [
                 'Forecourt Island Equipment',
                 'Forecourt Submerged Pump Package',
-                'Tank Equipment',
+                'Tank and Equipment',
                 'Tank Monitor Package',
-                'Tank Specifications',
                 'Dispensers - Wayne Anthem',
                 'Dispensers - Gilbarco',
                 'Canopy Equipment'
@@ -148,6 +146,12 @@ async function initDB() {
                     console.log(`✓ Added missing package: ${requiredPackages[i]}`);
                 }
             }
+            
+            // Rename "Tank Equipment" to "Tank and Equipment" if it exists
+            await client.query(`UPDATE package_templates SET name = 'Tank and Equipment' WHERE name = 'Tank Equipment'`);
+            
+            // Delete "Tank Specifications" if it exists
+            await client.query(`DELETE FROM package_templates WHERE name = 'Tank Specifications'`);
         }
 
         console.log('✓ Database tables initialized');
@@ -179,22 +183,25 @@ async function seedDefaultLineItems(client) {
         { package: 'Forecourt Submerged Pump Package', description: '2" ball valve', qty: 3, price: 0, isDefault: true },
         { package: 'Forecourt Submerged Pump Package', description: '2" X 16" flex connector', qty: 3, price: 0, isDefault: true },
         
-        // Tank Equipment
-        { package: 'Tank Equipment', description: 'Spill containment manhole', qty: 3, price: 0, isDefault: true },
-        { package: 'Tank Equipment', description: '10" overfill drop tube', qty: 3, price: 0, isDefault: true },
-        { package: 'Tank Equipment', description: '4" fill adaptor w/swivel', qty: 2, price: 0, isDefault: true },
-        { package: 'Tank Equipment', description: '4" adaptor standard', qty: 1, price: 0, isDefault: true },
-        { package: 'Tank Equipment', description: '4" fill cap', qty: 3, price: 0, isDefault: true },
-        { package: 'Tank Equipment', description: 'EVR vapor adaptor manhole', qty: 1, price: 0, isDefault: true },
-        { package: 'Tank Equipment', description: 'EVR vapor swivel adaptor', qty: 1, price: 0, isDefault: true },
-        { package: 'Tank Equipment', description: 'EVR adaptor cap', qty: 1, price: 0, isDefault: true },
-        { package: 'Tank Equipment', description: 'Extractor valve', qty: 3, price: 0, isDefault: true },
-        { package: 'Tank Equipment', description: 'Face seal adaptor', qty: 2, price: 0, isDefault: true },
-        { package: 'Tank Equipment', description: '2" EVR vent cap', qty: 2, price: 0, isDefault: true },
-        { package: 'Tank Equipment', description: 'Aluminum vent cap', qty: 1, price: 0, isDefault: true },
-        { package: 'Tank Equipment', description: 'Probe manhole', qty: 3, price: 0, isDefault: true },
-        { package: 'Tank Equipment', description: 'Interstitial Manhole', qty: 1, price: 0, isDefault: true },
-        { package: 'Tank Equipment', description: 'Monitor Well Manhole', qty: 2, price: 0, isDefault: true },
+        // Tank and Equipment
+        { package: 'Tank and Equipment', description: 'Spill containment manhole', qty: 3, price: 0, isDefault: true },
+        { package: 'Tank and Equipment', description: '10" overfill drop tube', qty: 3, price: 0, isDefault: true },
+        { package: 'Tank and Equipment', description: '4" fill adaptor w/swivel', qty: 2, price: 0, isDefault: true },
+        { package: 'Tank and Equipment', description: '4" adaptor standard', qty: 1, price: 0, isDefault: true },
+        { package: 'Tank and Equipment', description: '4" fill cap', qty: 3, price: 0, isDefault: true },
+        { package: 'Tank and Equipment', description: 'EVR vapor adaptor manhole', qty: 1, price: 0, isDefault: true },
+        { package: 'Tank and Equipment', description: 'EVR vapor swivel adaptor', qty: 1, price: 0, isDefault: true },
+        { package: 'Tank and Equipment', description: 'EVR adaptor cap', qty: 1, price: 0, isDefault: true },
+        { package: 'Tank and Equipment', description: 'Extractor valve', qty: 3, price: 0, isDefault: true },
+        { package: 'Tank and Equipment', description: 'Face seal adaptor', qty: 2, price: 0, isDefault: true },
+        { package: 'Tank and Equipment', description: '2" EVR vent cap', qty: 2, price: 0, isDefault: true },
+        { package: 'Tank and Equipment', description: 'Aluminum vent cap', qty: 1, price: 0, isDefault: true },
+        { package: 'Tank and Equipment', description: 'Probe manhole', qty: 3, price: 0, isDefault: true },
+        { package: 'Tank and Equipment', description: 'Interstitial Manhole', qty: 1, price: 0, isDefault: true },
+        { package: 'Tank and Equipment', description: 'Monitor Well Manhole', qty: 2, price: 0, isDefault: true },
+        { package: 'Tank and Equipment', description: '25,000 gallon ELUTRON double wall underground tank', qty: 1, price: 0, isDefault: true },
+        { package: 'Tank and Equipment', description: 'Add to above for tie-down straps', qty: 7, price: 0, isDefault: true },
+        { package: 'Tank and Equipment', description: 'Add to above for turnbuckles', qty: 14, price: 0, isDefault: true },
         
         // Tank Monitor Package
         { package: 'Tank Monitor Package', description: 'TLS-450PLUS Console (Dual USB, RS-232/RS-485)', qty: 1, price: 0, isDefault: true },
@@ -208,11 +215,6 @@ async function seedDefaultLineItems(client) {
         { package: 'Tank Monitor Package', description: 'Sump Sensor (Piping, 12ft Cable)', qty: 6, price: 0, isDefault: true },
         { package: 'Tank Monitor Package', description: 'Interstitial Sensor - Steel Tank (4-12ft)', qty: 1, price: 0, isDefault: true },
         { package: 'Tank Monitor Package', description: 'TLS450+ Continuous Statistical Leak Detection (CSLD)', qty: 1, price: 0, isDefault: true },
-        
-        // Tank Specifications
-        { package: 'Tank Specifications', description: '25,000 gallon ELUTRON double wall underground tank', qty: 1, price: 0, isDefault: true },
-        { package: 'Tank Specifications', description: 'Add to above for tie-down straps', qty: 7, price: 0, isDefault: true },
-        { package: 'Tank Specifications', description: 'Add to above for turnbuckles', qty: 14, price: 0, isDefault: true },
         
         // Dispensers - Wayne Anthem
         { package: 'Dispensers - Wayne Anthem', description: 'DUAL Passport POS terminal (2 servers, scanners, PIN pads)', qty: 1, price: 0, isDefault: true },
