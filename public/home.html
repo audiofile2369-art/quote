@@ -136,7 +136,10 @@
         <div class="jobs-container">
             <div class="jobs-header">
                 <h1>My Jobs</h1>
-                <button class="btn-new-job" onclick="createNewJob()">+ New Job</button>
+                <div style="display: flex; gap: 10px;">
+                    <button onclick="window.location.href='/settings.html'" style="background: #6c757d; color: white; border: none; padding: 12px 24px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 600;">⚙️ Project Settings</button>
+                    <button class="btn-new-job" onclick="createNewJob()">+ New Job</button>
+                </div>
             </div>
 
             <div id="jobsGrid" class="loading">

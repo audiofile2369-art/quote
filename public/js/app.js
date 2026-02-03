@@ -726,8 +726,20 @@ const app = {
                 const qtyReadonly = (this.data.mode === 'contractor' && !isContractorSection) ? readOnlyStyle : '';
                 const removeBtn = (this.data.mode !== 'contractor' || isContractorSection) ? `<button class="btn-remove" onclick="app.removeItem(${index})">×</button>` : '';
                 
+                // Add autocomplete container for description input
+                const descInputId = `desc-input-${index}`;
+                
                 row.innerHTML = `
-                    <td><input type="text" value="${escapedDesc}" onchange="app.updateItem(${index}, 'description', this.value)" ${descReadonly}></td>
+                    <td style="position: relative;">
+                        <input type="text" id="${descInputId}" value="${escapedDesc}" 
+                            onchange="app.updateItem(${index}, 'description', this.value)" 
+                            oninput="app.showAutocomplete(this, ${index})"
+                            onfocus="app.showAutocomplete(this, ${index})"
+                            onblur="setTimeout(() => app.hideAutocomplete(${index}), 200)"
+                            autocomplete="off"
+                            ${descReadonly}>
+                        <div id="autocomplete-${index}" class="autocomplete-dropdown" style="display: none;"></div>
+                    </td>
                     <td><input type="number" value="${item.qty || 0}" step="1" min="0" onchange="app.updateItem(${index}, 'qty', this.value)" ${qtyReadonly}></td>
                     <td><input type="number" value="${item.price || 0}" step="0.01" min="0" onchange="app.updateItem(${index}, 'price', this.value)"></td>
                     <td><input type="text" value="$${total.toFixed(2)}" readonly></td>
@@ -808,6 +820,68 @@ const app = {
                 updateState();
             }
         }
+    },
+    
+    // Autocomplete functions
+    autocompleteTimeout: null,
+    
+    async showAutocomplete(input, index) {
+        const query = input.value.trim();
+        const dropdown = document.getElementById(`autocomplete-${index}`);
+        if (!dropdown) return;
+        
+        if (query.length < 2) {
+            dropdown.style.display = 'none';
+            return;
+        }
+        
+        // Debounce API calls
+        clearTimeout(this.autocompleteTimeout);
+        this.autocompleteTimeout = setTimeout(async () => {
+            try {
+                const response = await fetch(`/api/line-item-templates/search?q=${encodeURIComponent(query)}`);
+                if (!response.ok) return;
+                
+                const items = await response.json();
+                
+                if (items.length === 0) {
+                    dropdown.style.display = 'none';
+                    return;
+                }
+                
+                let html = '';
+                items.forEach(item => {
+                    const price = parseFloat(item.default_price || 0).toFixed(2);
+                    html += `
+                        <div class="autocomplete-item" onmousedown="app.selectAutocomplete(${index}, '${item.description.replace(/'/g, "\\'")}', ${item.default_qty}, ${item.default_price || 0})">
+                            <div style="font-weight: 500;">${item.description}</div>
+                            <div style="font-size: 12px; color: #666;">Qty: ${item.default_qty} | $${price}</div>
+                        </div>
+                    `;
+                });
+                
+                dropdown.innerHTML = html;
+                dropdown.style.display = 'block';
+            } catch (err) {
+                console.error('Autocomplete error:', err);
+            }
+        }, 200);
+    },
+    
+    hideAutocomplete(index) {
+        const dropdown = document.getElementById(`autocomplete-${index}`);
+        if (dropdown) dropdown.style.display = 'none';
+    },
+    
+    selectAutocomplete(index, description, qty, price) {
+        this.data.items[index].description = description;
+        this.data.items[index].qty = qty;
+        this.data.items[index].price = price;
+        
+        this.hideAutocomplete(index);
+        this.renderItems();
+        this.calculateTotals();
+        this.save();
     },
     
     async addItemToCategory(category) {

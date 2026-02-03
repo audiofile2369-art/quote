@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FuelServicePro - Project Settings</title>
+    <link rel="icon" href="/fuelservicepro_logo.png" type="image/png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        .settings-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 30px;
+        }
+        
+        .settings-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+        }
+        
+        .settings-header h1 {
+            color: #3b82f6;
+            font-size: 1.8em;
+        }
+        
+        .settings-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #dee2e6;
+            padding-bottom: 10px;
+        }
+        
+        .settings-tab {
+            padding: 10px 20px;
+            border: none;
+            background: #f8f9fa;
+            border-radius: 6px 6px 0 0;
+            cursor: pointer;
+            font-weight: 600;
+            color: #6c757d;
+            transition: all 0.2s;
+        }
+        
+        .settings-tab.active {
+            background: #3b82f6;
+            color: white;
+        }
+        
+        .settings-tab:hover:not(.active) {
+            background: #e9ecef;
+        }
+        
+        .settings-content {
+            background: white;
+            border-radius: 8px;
+            padding: 25px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+        
+        .package-list {
+            display: grid;
+            gap: 15px;
+        }
+        
+        .package-item {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            padding: 15px 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border-left: 4px solid #3b82f6;
+        }
+        
+        .package-item input {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            font-size: 15px;
+        }
+        
+        .package-item .btn-small {
+            padding: 8px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 13px;
+        }
+        
+        .btn-view { background: #3b82f6; color: white; }
+        .btn-delete { background: #dc3545; color: white; }
+        .btn-save { background: #28a745; color: white; }
+        
+        .line-items-panel {
+            margin-top: 20px;
+            padding: 20px;
+            background: #fff;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+        }
+        
+        .line-items-panel h3 {
+            color: #495057;
+            margin-bottom: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .line-item-row {
+            display: grid;
+            grid-template-columns: 1fr 100px 120px 80px 100px;
+            gap: 10px;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        
+        .line-item-row:last-child {
+            border-bottom: none;
+        }
+        
+        .line-item-row input {
+            padding: 8px;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+        }
+        
+        .line-item-row input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+        }
+        
+        .add-new-row {
+            margin-top: 15px;
+            display: flex;
+            gap: 10px;
+        }
+        
+        .add-new-row input {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 15px;">
+                    <img src="/fuelservicepro_logo.png" alt="FuelServicePro" style="height: 60px; width: auto;">
+                    <div style="text-align: left;">
+                        <h1 style="margin: 0;">Project Settings</h1>
+                        <p style="margin: 5px 0 0 0;">Manage Equipment Packages & Line Item Templates</p>
+                    </div>
+                </div>
+                <button onclick="window.location.href='/home.html'" style="background: white; color: #3b82f6; border: 2px solid white; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 600; transition: all 0.2s;">
+                    ← Back to Jobs
+                </button>
+            </div>
+        </header>
+
+        <div class="settings-container">
+            <div class="settings-tabs">
+                <button class="settings-tab active" onclick="switchSettingsTab('packages')">Equipment Packages</button>
+                <button class="settings-tab" onclick="switchSettingsTab('lineItems')">All Line Items</button>
+            </div>
+            
+            <div id="tab-packages" class="settings-content">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h2 style="color: #495057; margin: 0;">Equipment Package Templates</h2>
+                    <button onclick="addNewPackage()" class="btn-small btn-save">➕ Add New Package</button>
+                </div>
+                
+                <div id="packageList" class="package-list">
+                    <p style="color: #999; text-align: center;">Loading packages...</p>
+                </div>
+                
+                <div id="lineItemsPanel" class="line-items-panel" style="display: none;">
+                    <h3>
+                        <span id="panelPackageName">Line Items for Package</span>
+                        <button onclick="hideLineItemsPanel()" class="btn-small" style="background: #6c757d; color: white;">✕ Close</button>
+                    </h3>
+                    <div id="lineItemsContent"></div>
+                    <div class="add-new-row">
+                        <input type="text" id="newItemDesc" placeholder="New line item description...">
+                        <input type="number" id="newItemQty" placeholder="Qty" value="1" style="width: 80px;">
+                        <input type="number" id="newItemPrice" placeholder="Price" value="0" step="0.01" style="width: 100px;">
+                        <button onclick="addLineItemToPackage()" class="btn-small btn-save">Add Item</button>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="tab-lineItems" class="settings-content" style="display: none;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h2 style="color: #495057; margin: 0;">All Line Item Templates</h2>
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <input type="text" id="searchLineItems" placeholder="Search line items..." oninput="filterLineItems(this.value)" style="padding: 10px; border: 1px solid #dee2e6; border-radius: 4px; width: 250px;">
+                    </div>
+                </div>
+                
+                <div id="allLineItemsList">
+                    <p style="color: #999; text-align: center;">Loading line items...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="notification" class="notification"></div>
+
+    <script>
+        let packages = [];
+        let allLineItems = [];
+        let currentPackageId = null;
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            loadPackages();
+            loadAllLineItems();
+        });
+        
+        function switchSettingsTab(tab) {
+            document.querySelectorAll('.settings-tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.settings-content').forEach(c => c.style.display = 'none');
+            
+            document.querySelector(`.settings-tab[onclick*="${tab}"]`).classList.add('active');
+            document.getElementById(`tab-${tab}`).style.display = 'block';
+        }
+        
+        async function loadPackages() {
+            try {
+                const response = await fetch('/api/package-templates');
+                packages = await response.json();
+                renderPackages();
+            } catch (err) {
+                console.error('Error loading packages:', err);
+            }
+        }
+        
+        function renderPackages() {
+            const container = document.getElementById('packageList');
+            
+            if (packages.length === 0) {
+                container.innerHTML = '<p style="color: #999; text-align: center;">No packages defined yet.</p>';
+                return;
+            }
+            
+            let html = '';
+            packages.forEach(pkg => {
+                html += `
+                    <div class="package-item" data-id="${pkg.id}">
+                        <input type="text" value="${pkg.name}" id="pkg-name-${pkg.id}">
+                        <button class="btn-small btn-view" onclick="showLineItems(${pkg.id}, '${pkg.name.replace(/'/g, "\\'")}')">📋 View Items</button>
+                        <button class="btn-small btn-save" onclick="savePackage(${pkg.id})">💾 Save</button>
+                        <button class="btn-small btn-delete" onclick="deletePackage(${pkg.id})">🗑️</button>
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html;
+        }
+        
+        async function addNewPackage() {
+            const name = prompt('Enter new package name:');
+            if (!name || !name.trim()) return;
+            
+            try {
+                const response = await fetch('/api/package-templates', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: name.trim() })
+                });
+                
+                if (response.ok) {
+                    showNotification('✓ Package created');
+                    loadPackages();
+                }
+            } catch (err) {
+                console.error('Error creating package:', err);
+            }
+        }
+        
+        async function savePackage(id) {
+            const name = document.getElementById(`pkg-name-${id}`).value.trim();
+            if (!name) return alert('Package name cannot be empty');
+            
+            try {
+                const response = await fetch(`/api/package-templates/${id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name })
+                });
+                
+                if (response.ok) {
+                    showNotification('✓ Package saved');
+                    loadPackages();
+                }
+            } catch (err) {
+                console.error('Error saving package:', err);
+            }
+        }
+        
+        async function deletePackage(id) {
+            if (!confirm('Delete this package? This will not delete the line items associated with it.')) return;
+            
+            try {
+                await fetch(`/api/package-templates/${id}`, { method: 'DELETE' });
+                showNotification('✓ Package deleted');
+                hideLineItemsPanel();
+                loadPackages();
+            } catch (err) {
+                console.error('Error deleting package:', err);
+            }
+        }
+        
+        async function showLineItems(packageId, packageName) {
+            currentPackageId = packageId;
+            document.getElementById('panelPackageName').textContent = `Line Items for: ${packageName}`;
+            document.getElementById('lineItemsPanel').style.display = 'block';
+            
+            try {
+                const response = await fetch(`/api/package-templates/${packageId}/line-items`);
+                const items = await response.json();
+                renderLineItems(items);
+            } catch (err) {
+                console.error('Error loading line items:', err);
+            }
+        }
+        
+        function renderLineItems(items) {
+            const container = document.getElementById('lineItemsContent');
+            
+            if (items.length === 0) {
+                container.innerHTML = '<p style="color: #999; text-align: center; padding: 20px;">No line items for this package yet.</p>';
+                return;
+            }
+            
+            let html = `
+                <div class="line-item-row" style="font-weight: 600; color: #495057; border-bottom: 2px solid #dee2e6;">
+                    <span>Description</span>
+                    <span>Qty</span>
+                    <span>Default Price</span>
+                    <span>Default?</span>
+                    <span>Actions</span>
+                </div>
+            `;
+            
+            items.forEach(item => {
+                html += `
+                    <div class="line-item-row" data-id="${item.id}">
+                        <input type="text" value="${item.description}" id="li-desc-${item.id}">
+                        <input type="number" value="${item.default_qty}" id="li-qty-${item.id}" step="1">
+                        <input type="number" value="${item.default_price || 0}" id="li-price-${item.id}" step="0.01">
+                        <input type="checkbox" ${item.is_default_for_package ? 'checked' : ''} id="li-default-${item.id}">
+                        <div style="display: flex; gap: 5px;">
+                            <button class="btn-small btn-save" onclick="saveLineItem(${item.id})">💾</button>
+                            <button class="btn-small btn-delete" onclick="deleteLineItem(${item.id})">🗑️</button>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html;
+        }
+        
+        function hideLineItemsPanel() {
+            document.getElementById('lineItemsPanel').style.display = 'none';
+            currentPackageId = null;
+        }
+        
+        async function addLineItemToPackage() {
+            if (!currentPackageId) return;
+            
+            const desc = document.getElementById('newItemDesc').value.trim();
+            const qty = document.getElementById('newItemQty').value || 1;
+            const price = document.getElementById('newItemPrice').value || 0;
+            
+            if (!desc) return alert('Please enter a description');
+            
+            try {
+                const response = await fetch('/api/line-item-templates', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        package_template_id: currentPackageId,
+                        description: desc,
+                        default_qty: qty,
+                        default_price: price,
+                        is_default_for_package: true
+                    })
+                });
+                
+                if (response.ok) {
+                    document.getElementById('newItemDesc').value = '';
+                    showNotification('✓ Line item added');
+                    
+                    // Refresh the line items panel
+                    const pkg = packages.find(p => p.id === currentPackageId);
+                    if (pkg) showLineItems(currentPackageId, pkg.name);
+                    
+                    loadAllLineItems();
+                }
+            } catch (err) {
+                console.error('Error adding line item:', err);
+            }
+        }
+        
+        async function saveLineItem(id) {
+            const desc = document.getElementById(`li-desc-${id}`).value.trim();
+            const qty = document.getElementById(`li-qty-${id}`).value;
+            const price = document.getElementById(`li-price-${id}`).value;
+            const isDefault = document.getElementById(`li-default-${id}`).checked;
+            
+            if (!desc) return alert('Description cannot be empty');
+            
+            try {
+                const response = await fetch(`/api/line-item-templates/${id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        package_template_id: currentPackageId,
+                        description: desc,
+                        default_qty: qty,
+                        default_price: price,
+                        is_default_for_package: isDefault
+                    })
+                });
+                
+                if (response.ok) {
+                    showNotification('✓ Line item saved');
+                    loadAllLineItems();
+                }
+            } catch (err) {
+                console.error('Error saving line item:', err);
+            }
+        }
+        
+        async function deleteLineItem(id) {
+            if (!confirm('Delete this line item template?')) return;
+            
+            try {
+                await fetch(`/api/line-item-templates/${id}`, { method: 'DELETE' });
+                showNotification('✓ Line item deleted');
+                
+                // Refresh
+                if (currentPackageId) {
+                    const pkg = packages.find(p => p.id === currentPackageId);
+                    if (pkg) showLineItems(currentPackageId, pkg.name);
+                }
+                loadAllLineItems();
+            } catch (err) {
+                console.error('Error deleting line item:', err);
+            }
+        }
+        
+        async function loadAllLineItems() {
+            try {
+                const response = await fetch('/api/line-item-templates');
+                allLineItems = await response.json();
+                renderAllLineItems(allLineItems);
+            } catch (err) {
+                console.error('Error loading all line items:', err);
+            }
+        }
+        
+        function renderAllLineItems(items) {
+            const container = document.getElementById('allLineItemsList');
+            
+            if (items.length === 0) {
+                container.innerHTML = '<p style="color: #999; text-align: center;">No line items found.</p>';
+                return;
+            }
+            
+            let html = `
+                <div class="line-item-row" style="font-weight: 600; color: #495057; border-bottom: 2px solid #dee2e6; grid-template-columns: 1fr 150px 100px 120px;">
+                    <span>Description</span>
+                    <span>Package</span>
+                    <span>Qty</span>
+                    <span>Price</span>
+                </div>
+            `;
+            
+            items.forEach(item => {
+                html += `
+                    <div class="line-item-row" style="grid-template-columns: 1fr 150px 100px 120px;">
+                        <span>${item.description}</span>
+                        <span style="color: #3b82f6; font-size: 13px;">${item.package_name || 'Unassigned'}</span>
+                        <span>${item.default_qty}</span>
+                        <span>$${parseFloat(item.default_price || 0).toFixed(2)}</span>
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html;
+        }
+        
+        function filterLineItems(query) {
+            if (!query.trim()) {
+                renderAllLineItems(allLineItems);
+                return;
+            }
+            
+            const filtered = allLineItems.filter(item => 
+                item.description.toLowerCase().includes(query.toLowerCase()) ||
+                (item.package_name && item.package_name.toLowerCase().includes(query.toLowerCase()))
+            );
+            renderAllLineItems(filtered);
+        }
+        
+        function showNotification(message) {
+            const el = document.getElementById('notification');
+            el.textContent = message;
+            el.classList.add('show');
+            setTimeout(() => el.classList.remove('show'), 3000);
+        }
+    </script>
+</body>
+</html>
