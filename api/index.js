@@ -125,6 +125,29 @@ async function initDB() {
             
             // Seed default line items
             await seedDefaultLineItems(client);
+        } else {
+            // Ensure all default packages exist (migration for existing databases)
+            const requiredPackages = [
+                'Forecourt Island Equipment',
+                'Forecourt Submerged Pump Package',
+                'Tank Equipment',
+                'Tank Monitor Package',
+                'Tank Specifications',
+                'Dispensers - Wayne Anthem',
+                'Dispensers - Gilbarco',
+                'Canopy Equipment'
+            ];
+            
+            for (let i = 0; i < requiredPackages.length; i++) {
+                const exists = await client.query('SELECT id FROM package_templates WHERE name = $1', [requiredPackages[i]]);
+                if (exists.rows.length === 0) {
+                    await client.query(
+                        'INSERT INTO package_templates (name, sort_order) VALUES ($1, $2)',
+                        [requiredPackages[i], i + 1]
+                    );
+                    console.log(`✓ Added missing package: ${requiredPackages[i]}`);
+                }
+            }
         }
 
         console.log('✓ Database tables initialized');
