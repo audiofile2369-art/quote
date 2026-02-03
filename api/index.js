@@ -154,6 +154,13 @@ async function initDB() {
             
             // Delete "Tank Specifications" if it exists
             await client.query(`DELETE FROM package_templates WHERE name = 'Tank Specifications'`);
+            
+            // Check if line_item_templates is empty and seed if needed
+            const lineItemCount = await client.query('SELECT COUNT(*) FROM line_item_templates');
+            if (parseInt(lineItemCount.rows[0].count) === 0) {
+                console.log('Line item templates empty, seeding...');
+                await seedDefaultLineItems(client);
+            }
         }
 
         console.log('✓ Database tables initialized');
