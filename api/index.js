@@ -39,18 +39,29 @@ async function initDB() {
                 files JSONB DEFAULT '[]',
                 section_scopes JSONB DEFAULT '{}',
                 section_disclaimers JSONB DEFAULT '{}',
+                contractor_section_disclaimers JSONB DEFAULT '{}',
                 contractor_assignments JSONB DEFAULT '{}',
                 created_at TIMESTAMP DEFAULT NOW(),
                 updated_at TIMESTAMP DEFAULT NOW()
             )
         `);
-        
+
         // Add contractor_assignments column if it doesn't exist (for existing tables)
         await client.query(`
-            DO $$ 
-            BEGIN 
+            DO $$
+            BEGIN
                 IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='jobs' AND column_name='contractor_assignments') THEN
                     ALTER TABLE jobs ADD COLUMN contractor_assignments JSONB DEFAULT '{}';
+                END IF;
+            END $$;
+        `);
+
+        // Add contractor_section_disclaimers column if it doesn't exist (for existing tables)
+        await client.query(`
+            DO $$
+            BEGIN
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='jobs' AND column_name='contractor_section_disclaimers') THEN
+                    ALTER TABLE jobs ADD COLUMN contractor_section_disclaimers JSONB DEFAULT '{}';
                 END IF;
             END $$;
         `);
@@ -324,8 +335,8 @@ app.post('/api/jobs', async (req, res) => {
                 client_name, site_address, quote_date, quote_number,
                 company_name, contact_name, phone, email,
                 project_notes, tax_rate, discount, payment_terms,
-                scope_of_work, disclaimers, files, section_scopes, section_disclaimers, contractor_assignments
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+                scope_of_work, disclaimers, files, section_scopes, section_disclaimers, contractor_section_disclaimers, contractor_assignments
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
             RETURNING id
         `, [
             req.body.clientName,
@@ -345,6 +356,7 @@ app.post('/api/jobs', async (req, res) => {
             JSON.stringify(req.body.files || []),
             JSON.stringify(req.body.sectionScopes || {}),
             JSON.stringify(req.body.sectionDisclaimers || {}),
+            JSON.stringify(req.body.contractorSectionDisclaimers || {}),
             JSON.stringify(req.body.contractorAssignments || {})
         ]);
 
@@ -424,8 +436,8 @@ app.put('/api/jobs/:id', async (req, res) => {
                 company_name = $5, contact_name = $6, phone = $7, email = $8,
                 project_notes = $9, tax_rate = $10, discount = $11, payment_terms = $12,
                 scope_of_work = $13, disclaimers = $14, files = $15,
-                section_scopes = $16, section_disclaimers = $17, contractor_assignments = $18, updated_at = NOW()
-            WHERE id = $19
+                section_scopes = $16, section_disclaimers = $17, contractor_section_disclaimers = $18, contractor_assignments = $19, updated_at = NOW()
+            WHERE id = $20
         `, [
             req.body.clientName,
             req.body.siteAddress,
@@ -444,6 +456,7 @@ app.put('/api/jobs/:id', async (req, res) => {
             JSON.stringify(mergedFiles),
             JSON.stringify(req.body.sectionScopes || {}),
             JSON.stringify(req.body.sectionDisclaimers || {}),
+            JSON.stringify(req.body.contractorSectionDisclaimers || {}),
             JSON.stringify(req.body.contractorAssignments || {}),
             req.params.id
         ]);

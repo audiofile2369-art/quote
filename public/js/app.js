@@ -20,6 +20,7 @@ const app = {
         disclaimers: '',
         sectionScopes: {}, // { 'package': 'scope text' }
         sectionDisclaimers: {}, // { 'package': 'disclaimer text' }
+        contractorSectionDisclaimers: {}, // { 'package': { 'contractorName': 'disclaimer text' } }
         contractorAssignments: {}, // { 'contractorName': ['Package A', 'Package B'] }
         mode: 'owner', // 'owner' or 'contractor'
         contractorName: null, // contractor viewing this
@@ -193,6 +194,7 @@ const app = {
             disclaimers: '',
             sectionScopes: {},
             sectionDisclaimers: {},
+            contractorSectionDisclaimers: {},
             contractorAssignments: {},
             mode: 'owner',
             contractorName: null,
@@ -633,13 +635,28 @@ const app = {
         const container = document.getElementById('sectionDisclaimersDisplay');
         if (!container) return;
 
-        const allDisclaimers = this.data.sectionDisclaimers || {};
-        let sections = Object.keys(allDisclaimers);
+        const ownerDisclaimers = this.data.sectionDisclaimers || {};
+        const contractorDisclaimers = this.data.contractorSectionDisclaimers || {};
+
+        // Get all sections that have either owner or contractor disclaimers
+        let sections = [...new Set([
+            ...Object.keys(ownerDisclaimers),
+            ...Object.keys(contractorDisclaimers)
+        ])];
 
         // In contractor mode, only show their assigned sections
         if (this.data.mode === 'contractor' && this.data.contractorSections && this.data.contractorSections.length) {
             sections = sections.filter(s => this.data.contractorSections.includes(s));
         }
+
+        // Filter to only sections that have content
+        sections = sections.filter(s => {
+            const hasOwner = ownerDisclaimers[s] && ownerDisclaimers[s].trim();
+            const hasContractor = contractorDisclaimers[s] && Object.keys(contractorDisclaimers[s]).some(
+                name => contractorDisclaimers[s][name] && contractorDisclaimers[s][name].trim()
+            );
+            return hasOwner || hasContractor;
+        });
 
         if (sections.length === 0) {
             container.innerHTML = '<p style="color:#666">No equipment package disclaimers yet. Add disclaimers from the Equipment Packages tab.</p>';
@@ -661,8 +678,8 @@ const app = {
         // Build sections styled like Line Items headers
         container.innerHTML = '';
         sections.forEach(sectionName => {
-            const disclaimerText = allDisclaimers[sectionName];
-            if (!disclaimerText || !disclaimerText.trim()) return;
+            const ownerText = ownerDisclaimers[sectionName] || '';
+            const contractorTexts = contractorDisclaimers[sectionName] || {};
 
             const contractors = getContractorsForCategory(sectionName);
             const contractorLabel = contractors.length
@@ -680,14 +697,42 @@ const app = {
                     <span>${sectionName}${contractorLabel}</span>
                 </div>
                 <div class="category-header-buttons">
-                    <button class="btn-header" onclick="app.editSectionDisclaimers('${sectionName}')">✏️ Edit</button>
+                    ${this.data.mode !== 'contractor' ? `<button class="btn-header" onclick="app.editSectionDisclaimers('${sectionName}')">✏️ Edit</button>` : ''}
                     ${showDeleteBtn ? `<button class="btn-header btn-delete-section" onclick="app.deleteSectionDisclaimer('${sectionName}')">🗑️ Delete</button>` : ''}
                 </div>
             `;
 
             const body = document.createElement('div');
             body.style.cssText = 'border:1px solid #dee2e6; border-top:none; border-radius:0 0 6px 6px; background:#fff; padding:15px;';
-            body.innerHTML = `<div style="white-space:pre-wrap; color:#333; line-height:1.6;">${disclaimerText}</div>`;
+
+            // Build body content with owner disclaimers and contractor disclaimers
+            let bodyHTML = '';
+
+            // Owner disclaimers
+            if (ownerText && ownerText.trim()) {
+                bodyHTML += `<div style="white-space:pre-wrap; color:#333; line-height:1.6;">${ownerText}</div>`;
+            }
+
+            // Contractor disclaimers
+            Object.keys(contractorTexts).forEach(contractorName => {
+                const text = contractorTexts[contractorName];
+                if (text && text.trim()) {
+                    bodyHTML += `
+                        <div style="margin-top: 20px; padding-top: 15px; border-top: 2px dashed #f59e0b;">
+                            <div style="font-weight: 600; color: #f59e0b; margin-bottom: 8px; font-size: 14px;">
+                                📝 Contractor Disclaimers (${contractorName})
+                            </div>
+                            <div style="white-space:pre-wrap; color:#333; line-height:1.6; background: #fffbeb; padding: 10px; border-radius: 4px;">${text}</div>
+                        </div>
+                    `;
+                }
+            });
+
+            if (!bodyHTML) {
+                bodyHTML = '<em style="color: #999;">No disclaimers added.</em>';
+            }
+
+            body.innerHTML = bodyHTML;
 
             wrapper.appendChild(header);
             wrapper.appendChild(body);
@@ -985,6 +1030,20 @@ const app = {
             
             const header = document.createElement('div');
             header.className = 'category-header';
+
+            // Build disclaimer buttons based on mode
+            let disclaimerButtons = '';
+            if (this.data.mode === 'contractor' && this.data.contractorSections.includes(category)) {
+                // Contractor sees: View owner disclaimers + Add their own
+                disclaimerButtons = `
+                    <button class="btn-header" onclick="app.viewSectionDisclaimers('${category}')">⚠️ View Disclaimers</button>
+                    <button class="btn-header" style="background: #f59e0b;" onclick="app.editContractorDisclaimers('${category}')">📝 Add My Disclaimers</button>
+                `;
+            } else {
+                // Owner sees: Edit disclaimers
+                disclaimerButtons = `<button class="btn-header" onclick="app.editSectionDisclaimers('${category}')">⚠️ Disclaimers</button>`;
+            }
+
             header.innerHTML = `
                 <div style="display: flex; align-items: center; gap: 10px;">
                     ${this.data.mode !== 'contractor' ? `<input type="checkbox" class="section-checkbox" data-category="${category}" style="width: 18px; height: 18px; cursor: pointer;">` : ''}
@@ -993,7 +1052,7 @@ const app = {
                 <div class="category-header-buttons">
                     ${this.data.mode !== 'contractor' ? `<button class="btn-header" onclick="app.sendSectionToContractor('${category}')">📤 Send to Contractor</button>` : ''}
                     <button class="btn-header" onclick="app.editSectionScope('${category}')">📋 Scope of Work</button>
-                    <button class="btn-header" onclick="app.editSectionDisclaimers('${category}')">⚠️ Disclaimers</button>
+                    ${disclaimerButtons}
                     ${this.data.mode !== 'contractor' ? `<button class="btn-header btn-delete-section" onclick="app.deleteSection('${category}')">🗑️ Delete Package</button>` : ''}
                 </div>
             `;
@@ -1433,6 +1492,7 @@ const app = {
             this.data.files = job.files || [];
             this.data.sectionScopes = job.section_scopes || {};
             this.data.sectionDisclaimers = job.section_disclaimers || {};
+            this.data.contractorSectionDisclaimers = job.contractor_section_disclaimers || {};
             this.data.contractorAssignments = job.contractor_assignments || {};
             this.data.items = job.items || [];
             
@@ -1773,7 +1833,76 @@ const app = {
         this.closeModal();
         this.showNotification('✓ Disclaimers saved to project!');
     },
-    
+
+    // View owner's disclaimers (read-only, for contractors)
+    viewSectionDisclaimers(category) {
+        const ownerDisclaimers = this.data.sectionDisclaimers[category] || '';
+
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.innerHTML = `
+            <div class="modal-content">
+                <h3>⚠️ Disclaimers - ${category}</h3>
+                <p style="color: #666; margin-bottom: 10px; font-size: 14px;">Project Manager's Disclaimers (Read Only)</p>
+                <div style="background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 6px; padding: 15px; min-height: 150px; white-space: pre-wrap; line-height: 1.6; color: #333;">
+                    ${ownerDisclaimers || '<em style="color: #999;">No disclaimers added by project manager.</em>'}
+                </div>
+                <div style="margin-top: 15px; text-align: right;">
+                    <button class="btn" onclick="app.closeModal()">Close</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        setTimeout(() => modal.classList.add('show'), 10);
+    },
+
+    // Contractor adds/edits their own disclaimers for a section
+    editContractorDisclaimers(category) {
+        if (!this.data.contractorSectionDisclaimers) {
+            this.data.contractorSectionDisclaimers = {};
+        }
+        if (!this.data.contractorSectionDisclaimers[category]) {
+            this.data.contractorSectionDisclaimers[category] = {};
+        }
+
+        const contractorName = this.data.contractorName || 'Contractor';
+        const currentText = this.data.contractorSectionDisclaimers[category][contractorName] || '';
+
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.innerHTML = `
+            <div class="modal-content">
+                <h3>📝 My Disclaimers - ${category}</h3>
+                <p style="color: #666; margin-bottom: 10px; font-size: 14px;">Add your disclaimers for this equipment package (${contractorName})</p>
+                <textarea id="contractorDisclaimersText" rows="10" style="width: 100%; padding: 10px; font-size: 14px;" placeholder="Enter your disclaimers, exclusions, or notes...">${currentText}</textarea>
+                <div style="margin-top: 15px; text-align: right;">
+                    <button class="btn" style="background: #28a745; margin-right: 10px;" onclick="app.saveContractorDisclaimers('${category}')">Save</button>
+                    <button class="btn" onclick="app.closeModal()">Cancel</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        setTimeout(() => modal.classList.add('show'), 10);
+    },
+
+    async saveContractorDisclaimers(category) {
+        const text = document.getElementById('contractorDisclaimersText').value;
+        const contractorName = this.data.contractorName || 'Contractor';
+
+        if (!this.data.contractorSectionDisclaimers) {
+            this.data.contractorSectionDisclaimers = {};
+        }
+        if (!this.data.contractorSectionDisclaimers[category]) {
+            this.data.contractorSectionDisclaimers[category] = {};
+        }
+
+        this.data.contractorSectionDisclaimers[category][contractorName] = text;
+        this.save();
+        await this.saveToDatabase(true);
+        this.closeModal();
+        this.showNotification('✓ Your disclaimers saved!');
+    },
+
     closeModal() {
         const modal = document.querySelector('.modal');
         if (modal) {
