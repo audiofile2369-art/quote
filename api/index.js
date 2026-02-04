@@ -44,6 +44,12 @@ async function initDB() {
                 contractor_assignments JSONB DEFAULT '{}',
                 todos JSONB DEFAULT '[]',
                 section_todos JSONB DEFAULT '{}',
+                meetings JSONB DEFAULT '[]',
+                section_meetings JSONB DEFAULT '{}',
+                critical_junctures JSONB DEFAULT '[]',
+                testing_calibration JSONB DEFAULT '{}',
+                testing_assignments JSONB DEFAULT '{}',
+                testing_schedules JSONB DEFAULT '{}',
                 created_at TIMESTAMP DEFAULT NOW(),
                 updated_at TIMESTAMP DEFAULT NOW()
             )
@@ -95,6 +101,66 @@ async function initDB() {
             BEGIN
                 IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='jobs' AND column_name='section_todos') THEN
                     ALTER TABLE jobs ADD COLUMN section_todos JSONB DEFAULT '{}';
+                END IF;
+            END $$;
+        `);
+
+        // Add meetings column if it doesn't exist
+        await client.query(`
+            DO $$
+            BEGIN
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='jobs' AND column_name='meetings') THEN
+                    ALTER TABLE jobs ADD COLUMN meetings JSONB DEFAULT '[]';
+                END IF;
+            END $$;
+        `);
+
+        // Add section_meetings column if it doesn't exist
+        await client.query(`
+            DO $$
+            BEGIN
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='jobs' AND column_name='section_meetings') THEN
+                    ALTER TABLE jobs ADD COLUMN section_meetings JSONB DEFAULT '{}';
+                END IF;
+            END $$;
+        `);
+
+        // Add critical_junctures column if it doesn't exist
+        await client.query(`
+            DO $$
+            BEGIN
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='jobs' AND column_name='critical_junctures') THEN
+                    ALTER TABLE jobs ADD COLUMN critical_junctures JSONB DEFAULT '[]';
+                END IF;
+            END $$;
+        `);
+
+        // Add testing_calibration column if it doesn't exist
+        await client.query(`
+            DO $$
+            BEGIN
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='jobs' AND column_name='testing_calibration') THEN
+                    ALTER TABLE jobs ADD COLUMN testing_calibration JSONB DEFAULT '{}';
+                END IF;
+            END $$;
+        `);
+
+        // Add testing_assignments column if it doesn't exist
+        await client.query(`
+            DO $$
+            BEGIN
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='jobs' AND column_name='testing_assignments') THEN
+                    ALTER TABLE jobs ADD COLUMN testing_assignments JSONB DEFAULT '{}';
+                END IF;
+            END $$;
+        `);
+
+        // Add testing_schedules column if it doesn't exist
+        await client.query(`
+            DO $$
+            BEGIN
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='jobs' AND column_name='testing_schedules') THEN
+                    ALTER TABLE jobs ADD COLUMN testing_schedules JSONB DEFAULT '{}';
                 END IF;
             END $$;
         `);
@@ -381,8 +447,8 @@ app.post('/api/jobs', async (req, res) => {
                 company_name, contact_name, phone, email,
                 project_notes, tax_rate, discount, payment_terms,
                 scope_of_work, disclaimers, files, section_scopes, section_disclaimers, contractor_section_disclaimers, section_upcharges, contractor_assignments,
-                todos, section_todos
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
+                todos, section_todos, meetings, section_meetings, critical_junctures, testing_calibration, testing_assignments, testing_schedules
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28)
             RETURNING id
         `, [
             req.body.clientName,
@@ -406,7 +472,13 @@ app.post('/api/jobs', async (req, res) => {
             JSON.stringify(req.body.sectionUpcharges || {}),
             JSON.stringify(req.body.contractorAssignments || {}),
             JSON.stringify(req.body.todos || []),
-            JSON.stringify(req.body.sectionTodos || {})
+            JSON.stringify(req.body.sectionTodos || {}),
+            JSON.stringify(req.body.meetings || []),
+            JSON.stringify(req.body.sectionMeetings || {}),
+            JSON.stringify(req.body.criticalJunctures || []),
+            JSON.stringify(req.body.testingCalibration || {}),
+            JSON.stringify(req.body.testingAssignments || {}),
+            JSON.stringify(req.body.testingSchedules || {})
         ]);
 
         const jobId = jobResult.rows[0].id;
@@ -486,8 +558,8 @@ app.put('/api/jobs/:id', async (req, res) => {
                 project_notes = $9, tax_rate = $10, discount = $11, payment_terms = $12,
                 scope_of_work = $13, disclaimers = $14, files = $15,
                 section_scopes = $16, section_disclaimers = $17, contractor_section_disclaimers = $18, section_upcharges = $19, contractor_assignments = $20,
-                todos = $21, section_todos = $22, updated_at = NOW()
-            WHERE id = $23
+                todos = $21, section_todos = $22, meetings = $23, section_meetings = $24, critical_junctures = $25, testing_calibration = $26, testing_assignments = $27, testing_schedules = $28, updated_at = NOW()
+            WHERE id = $29
         `, [
             req.body.clientName,
             req.body.siteAddress,
@@ -511,6 +583,12 @@ app.put('/api/jobs/:id', async (req, res) => {
             JSON.stringify(req.body.contractorAssignments || {}),
             JSON.stringify(req.body.todos || []),
             JSON.stringify(req.body.sectionTodos || {}),
+            JSON.stringify(req.body.meetings || []),
+            JSON.stringify(req.body.sectionMeetings || {}),
+            JSON.stringify(req.body.criticalJunctures || []),
+            JSON.stringify(req.body.testingCalibration || {}),
+            JSON.stringify(req.body.testingAssignments || {}),
+            JSON.stringify(req.body.testingSchedules || {}),
             req.params.id
         ]);
 

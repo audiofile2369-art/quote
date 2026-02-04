@@ -35,6 +35,9 @@
             <button class="tab" onclick="app.switchTab('items')">Equipment Packages</button>
             <button class="tab" onclick="app.switchTab('scope')">Scope of Work</button>
             <button class="tab" onclick="app.switchTab('disclaimers')">Disclaimers</button>
+            <button class="tab" onclick="app.switchTab('testing')">Testing & Calibration</button>
+            <button class="tab" onclick="app.switchTab('meetings')">Meetings</button>
+            <button class="tab" onclick="app.switchTab('calendar')">Calendar</button>
             <button class="tab" onclick="app.switchTab('todos')">Todo List</button>
             <button class="tab" onclick="app.switchTab('summary')">Summary</button>
         </div>
@@ -232,6 +235,71 @@
             <div id="sectionDisclaimersDisplay"></div>
         </div>
 
+        <!-- TAB: Testing & Calibration -->
+        <div id="tab-testing" class="tab-content">
+            <h2>Testing & Calibration</h2>
+
+            <div class="info-banner">
+                <strong>🔬 Post-Installation Testing:</strong> Track calibrations, testing schedules, assignments, and line items for each testing category.
+            </div>
+
+            <div id="testingSectionsDisplay"></div>
+        </div>
+
+        <!-- TAB: Meetings -->
+        <div id="tab-meetings" class="tab-content">
+            <h2>Meetings</h2>
+
+            <div class="info-banner">
+                <strong>📅 Schedule & Track Meetings:</strong> Manage project meetings, generate invite links, and track critical junctures requiring AB supervision.
+            </div>
+
+            <!-- General Meetings -->
+            <div class="form-group">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                    <label style="margin: 0;">General Project Meetings</label>
+                    <button onclick="app.showAddMeetingModal('general')" class="btn-header" style="background: #3b82f6;">+ Add Meeting</button>
+                </div>
+                <div id="generalMeetingsDisplay"></div>
+            </div>
+
+            <!-- Critical Junctures -->
+            <div class="form-group">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                    <label style="margin: 0; color: #dc3545; font-weight: 700;">🔴 Critical Junctures (AB Supervision Required)</label>
+                    <button onclick="app.showAddCriticalJunctureModal()" class="btn-header" style="background: #dc3545;">+ Add Critical Juncture</button>
+                </div>
+                <div id="criticalJuncturesDisplay"></div>
+            </div>
+
+            <!-- Package Meetings -->
+            <div id="packageMeetingsDisplay"></div>
+        </div>
+
+        <!-- TAB: Calendar -->
+        <div id="tab-calendar" class="tab-content">
+            <h2>Project Calendar</h2>
+
+            <div class="info-banner">
+                <strong>📆 Visual Timeline:</strong> See all meetings, testing schedules, critical junctures, and todo deadlines in one view.
+            </div>
+
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <button onclick="app.previousMonth()" class="btn" style="background: #6c757d; padding: 10px 20px;">← Previous</button>
+                <h3 id="calendarMonthYear" style="margin: 0;">Month Year</h3>
+                <button onclick="app.nextMonth()" class="btn" style="background: #6c757d; padding: 10px 20px;">Next →</button>
+            </div>
+
+            <div style="margin-bottom: 20px; display: flex; gap: 15px; flex-wrap: wrap; font-size: 13px;">
+                <span><span style="display: inline-block; width: 12px; height: 12px; background: #3b82f6; border-radius: 50%; margin-right: 5px;"></span>Meetings</span>
+                <span><span style="display: inline-block; width: 12px; height: 12px; background: #22c55e; border-radius: 50%; margin-right: 5px;"></span>Testing Schedules</span>
+                <span><span style="display: inline-block; width: 12px; height: 12px; background: #dc3545; border-radius: 50%; margin-right: 5px;"></span>Critical Junctures</span>
+                <span><span style="display: inline-block; width: 12px; height: 12px; background: #f59e0b; border-radius: 50%; margin-right: 5px;"></span>Todo Deadlines</span>
+            </div>
+
+            <div id="calendarGrid"></div>
+        </div>
+
         <!-- TAB: Todo List -->
         <div id="tab-todos" class="tab-content">
             <h2>Todo List</h2>
@@ -243,10 +311,7 @@
             <div class="form-group">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                     <label style="margin: 0;">General Todo Items</label>
-                </div>
-                <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-                    <input type="text" id="newTodoInput" placeholder="Enter a new todo item..." style="flex: 1;" onkeypress="if(event.key === 'Enter') app.addGeneralTodo()">
-                    <button onclick="app.addGeneralTodo()" class="btn" style="background: #28a745; color: white; padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">+ Add Todo</button>
+                    <button onclick="app.showAddTodoModal('general')" class="btn" style="background: #28a745; color: white; padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">+ Add Todo</button>
                 </div>
                 <div id="generalTodosDisplay"></div>
             </div>

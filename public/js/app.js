@@ -22,13 +22,30 @@ const app = {
         sectionDisclaimers: {}, // { 'package': 'disclaimer text' }
         contractorSectionDisclaimers: {}, // { 'package': { 'contractorName': 'disclaimer text' } }
         sectionUpcharges: {}, // { 'package': 15 } - percentage upcharge for cost -> price calculation
-        todos: [], // [{ id, text, completed, completedAt }] - general todos
-        sectionTodos: {}, // { 'package': [{ id, text, completed, completedAt }] }
+        todos: [], // [{ id, text, priority, deadline, completed, completedAt }] - general todos
+        sectionTodos: {}, // { 'package': [{ id, text, priority, deadline, completed, completedAt }] }
         contractorAssignments: {}, // { 'contractorName': ['Package A', 'Package B'] }
+        meetings: [], // [{ id, title, datetime, location, notes, createdAt }]
+        sectionMeetings: {}, // { 'package': [meeting objects] }
+        criticalJunctures: [], // [{ id, date, description, assignedPerson, createdAt }]
+        testingCalibration: {}, // { 'Section Name': { lineItems: [{ id, description, qty, cost, price, status }] } }
+        testingAssignments: {}, // { 'Section Name': 'Company Name' }
+        testingSchedules: {}, // { 'Section Name': { scheduledDate, startDate, endDate } }
         mode: 'owner', // 'owner' or 'contractor'
         contractorName: null, // contractor viewing this
         contractorSection: null, // which package the contractor can edit (deprecated)
         contractorSections: [] // multiple packages for contractor
+    },
+    
+    // Fixed testing sections
+    TESTING_SECTIONS: ['Dispenser Calibrations', 'UDC and STP Sump Testing', 'Line Testing', 'Tank Testing'],
+    
+    // Priority definitions
+    PRIORITIES: {
+        'P1': { label: 'P1', name: 'Urgent', color: '#dc3545', description: 'Critical, needs immediate attention' },
+        'P2': { label: 'P2', name: 'High', color: '#f59e0b', description: 'Important, address soon' },
+        'P3': { label: 'P3', name: 'Normal', color: '#3b82f6', description: 'Standard priority' },
+        'P4': { label: 'P4', name: 'Low', color: '#6b7280', description: 'When time permits' }
     },
     
     // Cache for templates
@@ -36,6 +53,7 @@ const app = {
     lineItemTemplates: [],
     
     saveTimeout: null, // For debouncing auto-saves
+    calendarDate: new Date(), // Current calendar view date
 
     // Format number as currency with commas (e.g., 1234.56 -> "1,234.56")
     formatCurrency(value) {
@@ -214,6 +232,12 @@ const app = {
             todos: [],
             sectionTodos: {},
             contractorAssignments: {},
+            meetings: [],
+            sectionMeetings: {},
+            criticalJunctures: [],
+            testingCalibration: {},
+            testingAssignments: {},
+            testingSchedules: {},
             mode: 'owner',
             contractorName: null,
             contractorSection: null,
@@ -514,6 +538,12 @@ const app = {
             this.renderSectionDisclaimers();
         } else if (tabName === 'todos') {
             this.renderTodos();
+        } else if (tabName === 'testing') {
+            this.renderTestingSections();
+        } else if (tabName === 'meetings') {
+            this.renderMeetings();
+        } else if (tabName === 'calendar') {
+            this.renderCalendar();
         }
     },
 
@@ -849,21 +879,45 @@ const app = {
             return;
         }
 
+        // Sort: Priority first (P1 > P2 > P3 > P4), then deadline (earliest first), then creation
+        const sortedTodos = [...todos].map((t, i) => ({ ...t, originalIndex: i })).sort((a, b) => {
+            // Priority sort (P1=1, P2=2, P3=3, P4=4)
+            const priorityA = parseInt(a.priority?.substring(1)) || 3;
+            const priorityB = parseInt(b.priority?.substring(1)) || 3;
+            if (priorityA !== priorityB) return priorityA - priorityB;
+            
+            // Deadline sort (null deadlines go last)
+            if (a.deadline && !b.deadline) return -1;
+            if (!a.deadline && b.deadline) return 1;
+            if (a.deadline && b.deadline) {
+                return new Date(a.deadline) - new Date(b.deadline);
+            }
+            
+            return 0;
+        });
+
         let html = '<div style="background: white; border: 1px solid #dee2e6; border-radius: 6px; overflow: hidden;">';
-        todos.forEach((todo, index) => {
+        sortedTodos.forEach((todo) => {
             const isCompleted = todo.completed;
             const completedDate = todo.completedAt ? new Date(todo.completedAt).toLocaleString() : '';
+            const priority = this.PRIORITIES[todo.priority || 'P3'];
+            const isOverdue = !isCompleted && todo.deadline && new Date(todo.deadline) < new Date();
+            
             html += `
                 <div style="display: flex; align-items: center; gap: 12px; padding: 12px 15px; border-bottom: 1px solid #f0f0f0; ${isCompleted ? 'background: #f0fdf4;' : ''}">
                     <input type="checkbox" ${isCompleted ? 'checked' : ''}
-                        onclick="app.showCompleteTodoModal('general', ${index})"
+                        onclick="app.showCompleteTodoModal('general', ${todo.originalIndex})"
                         style="width: 20px; height: 20px; cursor: pointer;">
                     <div style="flex: 1; ${isCompleted ? 'text-decoration: line-through; color: #6b7280;' : ''}">
-                        ${todo.text}
+                        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                            <span style="background: ${priority.color}; color: white; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;">${priority.label}</span>
+                            <span>${todo.text}</span>
+                            ${todo.deadline ? `<span style="font-size: 12px; color: ${isOverdue ? '#dc3545' : '#6b7280'}; font-weight: ${isOverdue ? '600' : 'normal'};">📅 ${new Date(todo.deadline).toLocaleDateString()}${isOverdue ? ' (OVERDUE)' : ''}</span>` : ''}
+                        </div>
                         ${isCompleted ? `<div style="font-size: 11px; color: #22c55e; margin-top: 2px;">Completed: ${completedDate}</div>` : ''}
                     </div>
-                    <button onclick="app.editTodo('general', ${index})" style="background: none; border: none; cursor: pointer; font-size: 16px;" title="Edit">✏️</button>
-                    <button onclick="app.deleteTodo('general', ${index})" style="background: none; border: none; cursor: pointer; font-size: 16px; color: #dc3545;" title="Delete">🗑️</button>
+                    <button onclick="app.editTodo('general', ${todo.originalIndex})" style="background: none; border: none; cursor: pointer; font-size: 16px;" title="Edit">✏️</button>
+                    <button onclick="app.deleteTodo('general', ${todo.originalIndex})" style="background: none; border: none; cursor: pointer; font-size: 16px; color: #dc3545;" title="Delete">🗑️</button>
                 </div>
             `;
         });
@@ -890,6 +944,21 @@ const app = {
             const todos = sectionTodos[pkg] || [];
             const completedCount = todos.filter(t => t.completed).length;
 
+            // Sort todos by priority and deadline
+            const sortedTodos = [...todos].map((t, i) => ({ ...t, originalIndex: i })).sort((a, b) => {
+                const priorityA = parseInt(a.priority?.substring(1)) || 3;
+                const priorityB = parseInt(b.priority?.substring(1)) || 3;
+                if (priorityA !== priorityB) return priorityA - priorityB;
+                
+                if (a.deadline && !b.deadline) return -1;
+                if (!a.deadline && b.deadline) return 1;
+                if (a.deadline && b.deadline) {
+                    return new Date(a.deadline) - new Date(b.deadline);
+                }
+                
+                return 0;
+            });
+
             html += `
                 <div class="category-section" style="margin-bottom: 15px;">
                     <div class="category-header" style="cursor: default;">
@@ -897,7 +966,7 @@ const app = {
                             <span>${pkg}</span>
                             <span style="font-size: 12px; color: #6b7280; font-weight: normal;">(${completedCount}/${todos.length} completed)</span>
                         </div>
-                        <button class="btn-header" onclick="app.addSectionTodo('${pkg}')">+ Add Todo</button>
+                        <button class="btn-header" onclick="app.showAddTodoModal('${pkg}')">+ Add Todo</button>
                     </div>
                     <div style="border: 1px solid #dee2e6; border-top: none; border-radius: 0 0 6px 6px; background: white;">
             `;
@@ -905,20 +974,27 @@ const app = {
             if (todos.length === 0) {
                 html += '<p style="color: #999; font-style: italic; padding: 15px; margin: 0;">No todos for this package.</p>';
             } else {
-                todos.forEach((todo, index) => {
+                sortedTodos.forEach((todo) => {
                     const isCompleted = todo.completed;
                     const completedDate = todo.completedAt ? new Date(todo.completedAt).toLocaleString() : '';
+                    const priority = this.PRIORITIES[todo.priority || 'P3'];
+                    const isOverdue = !isCompleted && todo.deadline && new Date(todo.deadline) < new Date();
+                    
                     html += `
                         <div style="display: flex; align-items: center; gap: 12px; padding: 12px 15px; border-bottom: 1px solid #f0f0f0; ${isCompleted ? 'background: #f0fdf4;' : ''}">
                             <input type="checkbox" ${isCompleted ? 'checked' : ''}
-                                onclick="app.showCompleteTodoModal('${pkg}', ${index})"
+                                onclick="app.showCompleteTodoModal('${pkg}', ${todo.originalIndex})"
                                 style="width: 20px; height: 20px; cursor: pointer;">
                             <div style="flex: 1; ${isCompleted ? 'text-decoration: line-through; color: #6b7280;' : ''}">
-                                ${todo.text}
+                                <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                                    <span style="background: ${priority.color}; color: white; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;">${priority.label}</span>
+                                    <span>${todo.text}</span>
+                                    ${todo.deadline ? `<span style="font-size: 12px; color: ${isOverdue ? '#dc3545' : '#6b7280'}; font-weight: ${isOverdue ? '600' : 'normal'};">📅 ${new Date(todo.deadline).toLocaleDateString()}${isOverdue ? ' (OVERDUE)' : ''}</span>` : ''}
+                                </div>
                                 ${isCompleted ? `<div style="font-size: 11px; color: #22c55e; margin-top: 2px;">Completed: ${completedDate}</div>` : ''}
                             </div>
-                            <button onclick="app.editTodo('${pkg}', ${index})" style="background: none; border: none; cursor: pointer; font-size: 16px;" title="Edit">✏️</button>
-                            <button onclick="app.deleteTodo('${pkg}', ${index})" style="background: none; border: none; cursor: pointer; font-size: 16px; color: #dc3545;" title="Delete">🗑️</button>
+                            <button onclick="app.editTodo('${pkg}', ${todo.originalIndex})" style="background: none; border: none; cursor: pointer; font-size: 16px;" title="Edit">✏️</button>
+                            <button onclick="app.deleteTodo('${pkg}', ${todo.originalIndex})" style="background: none; border: none; cursor: pointer; font-size: 16px; color: #dc3545;" title="Delete">🗑️</button>
                         </div>
                     `;
                 });
@@ -930,44 +1006,77 @@ const app = {
         container.innerHTML = html;
     },
 
-    async addGeneralTodo() {
-        const input = document.getElementById('newTodoInput');
-        const text = input.value.trim();
-        if (!text) return;
+    showAddTodoModal(category) {
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.innerHTML = `
+            <div class="modal-content" style="max-width: 500px;">
+                <h3>Add Todo${category !== 'general' ? ` - ${category}` : ''}</h3>
+                <div class="form-group">
+                    <label>Task Description:</label>
+                    <input type="text" id="todoText" placeholder="Enter task description" style="width: 100%; padding: 10px; border: 1px solid #dee2e6; border-radius: 6px;">
+                </div>
+                <div class="form-group">
+                    <label>Priority:</label>
+                    <select id="todoPriority" style="width: 100%; padding: 10px; border: 1px solid #dee2e6; border-radius: 6px;">
+                        <option value="P1">P1 - Urgent (Critical, needs immediate attention)</option>
+                        <option value="P2">P2 - High (Important, address soon)</option>
+                        <option value="P3" selected>P3 - Normal (Standard priority)</option>
+                        <option value="P4">P4 - Low (When time permits)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Deadline (Optional):</label>
+                    <input type="date" id="todoDeadline" style="width: 100%; padding: 10px; border: 1px solid #dee2e6; border-radius: 6px;">
+                </div>
+                <div style="margin-top: 20px; display: flex; gap: 10px; justify-content: flex-end;">
+                    <button onclick="app.closeModal()" class="btn" style="background: #6c757d;">Cancel</button>
+                    <button onclick="app.confirmAddTodo('${category}')" class="btn" style="background: #3b82f6;">✓ Add Todo</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        setTimeout(() => modal.classList.add('show'), 10);
+        setTimeout(() => document.getElementById('todoText').focus(), 100);
+    },
 
-        if (!this.data.todos) this.data.todos = [];
-        this.data.todos.push({
+    async confirmAddTodo(category) {
+        const text = document.getElementById('todoText').value.trim();
+        const priority = document.getElementById('todoPriority').value;
+        const deadline = document.getElementById('todoDeadline').value || null;
+
+        if (!text) {
+            alert('Please enter a task description');
+            return;
+        }
+
+        const newTodo = {
             id: Date.now(),
             text: text,
+            priority: priority,
+            deadline: deadline,
             completed: false,
             completedAt: null
-        });
+        };
 
-        input.value = '';
+        if (category === 'general') {
+            if (!this.data.todos) this.data.todos = [];
+            this.data.todos.push(newTodo);
+        } else {
+            if (!this.data.sectionTodos) this.data.sectionTodos = {};
+            if (!this.data.sectionTodos[category]) this.data.sectionTodos[category] = [];
+            this.data.sectionTodos[category].push(newTodo);
+        }
+
+        this.closeModal();
         this.save();
         await this.saveToDatabase(false);
-        this.renderGeneralTodos();
+        this.renderTodos();
         this.showNotification('✓ Todo added');
     },
 
     addSectionTodo(category) {
-        const text = prompt(`Add todo for "${category}":`);
-        if (!text || !text.trim()) return;
-
-        if (!this.data.sectionTodos) this.data.sectionTodos = {};
-        if (!this.data.sectionTodos[category]) this.data.sectionTodos[category] = [];
-
-        this.data.sectionTodos[category].push({
-            id: Date.now(),
-            text: text.trim(),
-            completed: false,
-            completedAt: null
-        });
-
-        this.save();
-        this.saveToDatabase(false);
-        this.renderSectionTodos();
-        this.showNotification('✓ Todo added');
+        this.showAddTodoModal(category);
     },
 
     showCompleteTodoModal(category, index) {
@@ -1038,16 +1147,62 @@ const app = {
 
         if (!todo) return;
 
-        const newText = prompt('Edit todo:', todo.text);
-        if (newText === null) return; // Cancelled
-        if (!newText.trim()) {
-            alert('Todo text cannot be empty');
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.innerHTML = `
+            <div class="modal-content" style="max-width: 500px;">
+                <h3>Edit Todo</h3>
+                <div class="form-group">
+                    <label>Task Description:</label>
+                    <input type="text" id="editTodoText" value="${todo.text.replace(/"/g, '&quot;')}" style="width: 100%; padding: 10px; border: 1px solid #dee2e6; border-radius: 6px;">
+                </div>
+                <div class="form-group">
+                    <label>Priority:</label>
+                    <select id="editTodoPriority" style="width: 100%; padding: 10px; border: 1px solid #dee2e6; border-radius: 6px;">
+                        <option value="P1" ${todo.priority === 'P1' ? 'selected' : ''}>P1 - Urgent</option>
+                        <option value="P2" ${todo.priority === 'P2' ? 'selected' : ''}>P2 - High</option>
+                        <option value="P3" ${(todo.priority === 'P3' || !todo.priority) ? 'selected' : ''}>P3 - Normal</option>
+                        <option value="P4" ${todo.priority === 'P4' ? 'selected' : ''}>P4 - Low</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Deadline (Optional):</label>
+                    <input type="date" id="editTodoDeadline" value="${todo.deadline || ''}" style="width: 100%; padding: 10px; border: 1px solid #dee2e6; border-radius: 6px;">
+                </div>
+                <div style="margin-top: 20px; display: flex; gap: 10px; justify-content: flex-end;">
+                    <button onclick="app.closeModal()" class="btn" style="background: #6c757d;">Cancel</button>
+                    <button onclick="app.confirmEditTodo('${category}', ${index})" class="btn" style="background: #3b82f6;">✓ Save Changes</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        setTimeout(() => modal.classList.add('show'), 10);
+        setTimeout(() => document.getElementById('editTodoText').focus(), 100);
+    },
+
+    async confirmEditTodo(category, index) {
+        const text = document.getElementById('editTodoText').value.trim();
+        const priority = document.getElementById('editTodoPriority').value;
+        const deadline = document.getElementById('editTodoDeadline').value || null;
+
+        if (!text) {
+            alert('Task description cannot be empty');
             return;
         }
 
-        todo.text = newText.trim();
+        const isGeneral = category === 'general';
+        const todos = isGeneral ? this.data.todos : (this.data.sectionTodos[category] || []);
+        const todo = todos[index];
+
+        if (todo) {
+            todo.text = text;
+            todo.priority = priority;
+            todo.deadline = deadline;
+        }
+
+        this.closeModal();
         this.save();
-        this.saveToDatabase(false);
+        await this.saveToDatabase(false);
         this.renderTodos();
         this.showNotification('✓ Todo updated');
     },
@@ -1066,6 +1221,792 @@ const app = {
         await this.saveToDatabase(false);
         this.renderTodos();
         this.showNotification('✓ Todo deleted');
+    },
+
+    // ===== TESTING & CALIBRATION =====
+    renderTestingSections() {
+        const container = document.getElementById('testingSectionsDisplay');
+        if (!container) return;
+
+        let html = '';
+        this.TESTING_SECTIONS.forEach(section => {
+            const assignment = this.data.testingAssignments?.[section] || 'Not Assigned';
+            const schedule = this.data.testingSchedules?.[section] || {};
+            const lineItems = this.data.testingCalibration?.[section]?.lineItems || [];
+
+            const totalCost = lineItems.reduce((sum, item) => sum + (parseFloat(item.cost) || 0) * (parseFloat(item.qty) || 0), 0);
+            const totalPrice = lineItems.reduce((sum, item) => sum + (parseFloat(item.price) || 0) * (parseFloat(item.qty) || 0), 0);
+            const profit = totalPrice - totalCost;
+
+            html += `
+                <div class="category-section" style="margin-bottom: 20px;">
+                    <div class="category-header">
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <span>${section}</span>
+                            <span style="background: #3b82f6; color: white; padding: 4px 10px; border-radius: 4px; font-size: 12px; font-weight: 600; cursor: pointer;" onclick="app.editTestingCompany('${section}')">${assignment}</span>
+                            <button onclick="app.editTestingSchedule('${section}')" class="btn-header" style="background: #22c55e; font-size: 12px;">📅 Schedule</button>
+                        </div>
+                        <button class="btn-header" onclick="app.addTestingLineItem('${section}')">+ Add Item</button>
+                    </div>
+                    <div style="border: 1px solid #dee2e6; border-top: none; border-radius: 0 0 6px 6px; background: white;">
+            `;
+
+            if (schedule.scheduledDate || (schedule.startDate && schedule.endDate)) {
+                html += `<div style="padding: 10px 15px; background: #f0fdf4; border-bottom: 1px solid #e5e7eb; font-size: 13px; color: #22c55e; font-weight: 600;">`;
+                if (schedule.scheduledDate) {
+                    html += `📅 Scheduled: ${new Date(schedule.scheduledDate).toLocaleDateString()}`;
+                } else {
+                    html += `📅 ${new Date(schedule.startDate).toLocaleDateString()} - ${new Date(schedule.endDate).toLocaleDateString()}`;
+                }
+                html += `</div>`;
+            }
+
+            if (lineItems.length === 0) {
+                html += '<p style="color: #999; font-style: italic; padding: 15px; margin: 0;">No line items yet.</p>';
+            } else {
+                html += `
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <thead>
+                            <tr style="background: #f8f9fa; border-bottom: 2px solid #dee2e6;">
+                                <th style="padding: 10px; text-align: left; width: 35%;">Description</th>
+                                <th style="padding: 10px; text-align: center; width: 10%;">Qty</th>
+                                <th style="padding: 10px; text-align: right; width: 15%;">Cost</th>
+                                <th style="padding: 10px; text-align: right; width: 15%;">Price</th>
+                                <th style="padding: 10px; text-align: center; width: 15%;">Status</th>
+                                <th style="padding: 10px; text-align: center; width: 10%;"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                `;
+                lineItems.forEach((item, index) => {
+                    const statusColors = {
+                        'pending': '#6b7280',
+                        'scheduled': '#f59e0b',
+                        'completed': '#22c55e'
+                    };
+                    const statusColor = statusColors[item.status] || '#6b7280';
+
+                    html += `
+                        <tr style="border-bottom: 1px solid #f0f0f0;">
+                            <td style="padding: 10px;">${item.description}</td>
+                            <td style="padding: 10px; text-align: center;">${item.qty}</td>
+                            <td style="padding: 10px; text-align: right;">$${this.formatCurrency(item.cost * item.qty)}</td>
+                            <td style="padding: 10px; text-align: right;">$${this.formatCurrency(item.price * item.qty)}</td>
+                            <td style="padding: 10px; text-align: center;">
+                                <select onchange="app.updateTestingItemStatus('${section}', ${index}, this.value)" style="padding: 5px; border: 1px solid ${statusColor}; border-radius: 4px; background: ${statusColor}; color: white; font-weight: 600; font-size: 11px; cursor: pointer;">
+                                    <option value="pending" ${item.status === 'pending' ? 'selected' : ''}>Pending</option>
+                                    <option value="scheduled" ${item.status === 'scheduled' ? 'selected' : ''}>Scheduled</option>
+                                    <option value="completed" ${item.status === 'completed' ? 'selected' : ''}>Completed</option>
+                                </select>
+                            </td>
+                            <td style="padding: 10px; text-align: center;">
+                                <button onclick="app.deleteTestingLineItem('${section}', ${index})" style="background: none; border: none; cursor: pointer; font-size: 16px; color: #dc3545;" title="Delete">🗑️</button>
+                            </td>
+                        </tr>
+                    `;
+                });
+                html += `
+                        </tbody>
+                    </table>
+                    <div style="padding: 15px; background: #f8f9fa; border-top: 2px solid #dee2e6; display: flex; justify-content: space-between; font-weight: 600;">
+                        <span>Section Totals:</span>
+                        <div>
+                            <span style="margin-right: 20px;">Cost: $${this.formatCurrency(totalCost)}</span>
+                            <span style="margin-right: 20px; color: ${profit >= 0 ? '#22c55e' : '#dc3545'};">Profit: $${this.formatCurrency(profit)}</span>
+                            <span>Total: $${this.formatCurrency(totalPrice)}</span>
+                        </div>
+                    </div>
+                `;
+            }
+
+            html += '</div></div>';
+        });
+
+        container.innerHTML = html;
+    },
+
+    editTestingCompany(section) {
+        const currentCompany = this.data.testingAssignments?.[section] || '';
+        const companyName = prompt(`Assign company for "${section}":`, currentCompany);
+        if (companyName === null) return;
+
+        if (!this.data.testingAssignments) this.data.testingAssignments = {};
+        this.data.testingAssignments[section] = companyName.trim();
+
+        this.save();
+        this.saveToDatabase(false);
+        this.renderTestingSections();
+        this.showNotification('✓ Company assigned');
+    },
+
+    editTestingSchedule(section) {
+        const schedule = this.data.testingSchedules?.[section] || {};
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.innerHTML = `
+            <div class="modal-content" style="max-width: 500px;">
+                <h3>Schedule ${section}</h3>
+                <div class="form-group">
+                    <label>Schedule Type:</label>
+                    <select id="scheduleType" onchange="document.getElementById('singleDateField').style.display = this.value === 'single' ? 'block' : 'none'; document.getElementById('rangeDateFields').style.display = this.value === 'range' ? 'block' : 'none';" style="width: 100%; padding: 10px; border: 1px solid #dee2e6; border-radius: 6px;">
+                        <option value="single" ${schedule.scheduledDate ? 'selected' : ''}>Single Date</option>
+                        <option value="range" ${(schedule.startDate && schedule.endDate) ? 'selected' : ''}>Date Range</option>
+                    </select>
+                </div>
+                <div id="singleDateField" class="form-group" style="display: ${schedule.scheduledDate ? 'block' : 'none'};">
+                    <label>Scheduled Date:</label>
+                    <input type="date" id="scheduledDate" value="${schedule.scheduledDate || ''}" style="width: 100%; padding: 10px; border: 1px solid #dee2e6; border-radius: 6px;">
+                </div>
+                <div id="rangeDateFields" style="display: ${(schedule.startDate && schedule.endDate) ? 'block' : 'none'};">
+                    <div class="form-group">
+                        <label>Start Date:</label>
+                        <input type="date" id="startDate" value="${schedule.startDate || ''}" style="width: 100%; padding: 10px; border: 1px solid #dee2e6; border-radius: 6px;">
+                    </div>
+                    <div class="form-group">
+                        <label>End Date:</label>
+                        <input type="date" id="endDate" value="${schedule.endDate || ''}" style="width: 100%; padding: 10px; border: 1px solid #dee2e6; border-radius: 6px;">
+                    </div>
+                </div>
+                <div style="margin-top: 20px; display: flex; gap: 10px; justify-content: flex-end;">
+                    <button onclick="app.closeModal()" class="btn" style="background: #6c757d;">Cancel</button>
+                    <button onclick="app.confirmTestingSchedule('${section}')" class="btn" style="background: #22c55e;">✓ Save Schedule</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        setTimeout(() => modal.classList.add('show'), 10);
+    },
+
+    async confirmTestingSchedule(section) {
+        const type = document.getElementById('scheduleType').value;
+        
+        if (!this.data.testingSchedules) this.data.testingSchedules = {};
+
+        if (type === 'single') {
+            const date = document.getElementById('scheduledDate').value;
+            if (!date) {
+                alert('Please select a date');
+                return;
+            }
+            this.data.testingSchedules[section] = { scheduledDate: date };
+        } else {
+            const start = document.getElementById('startDate').value;
+            const end = document.getElementById('endDate').value;
+            if (!start || !end) {
+                alert('Please select both start and end dates');
+                return;
+            }
+            this.data.testingSchedules[section] = { startDate: start, endDate: end };
+        }
+
+        this.closeModal();
+        this.save();
+        await this.saveToDatabase(false);
+        this.renderTestingSections();
+        this.showNotification('✓ Schedule saved');
+    },
+
+    addTestingLineItem(section) {
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.innerHTML = `
+            <div class="modal-content" style="max-width: 600px;">
+                <h3>Add Line Item - ${section}</h3>
+                <div class="form-group">
+                    <label>Description:</label>
+                    <input type="text" id="testingDescription" placeholder="e.g., Dispenser calibration - Pump 1" style="width: 100%; padding: 10px; border: 1px solid #dee2e6; border-radius: 6px;">
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
+                    <div class="form-group">
+                        <label>Quantity:</label>
+                        <input type="number" id="testingQty" value="1" step="1" min="0" style="width: 100%; padding: 10px; border: 1px solid #dee2e6; border-radius: 6px;">
+                    </div>
+                    <div class="form-group">
+                        <label>Cost (per unit):</label>
+                        <input type="number" id="testingCost" value="0" step="0.01" min="0" style="width: 100%; padding: 10px; border: 1px solid #dee2e6; border-radius: 6px;">
+                    </div>
+                    <div class="form-group">
+                        <label>Price (per unit):</label>
+                        <input type="number" id="testingPrice" value="0" step="0.01" min="0" style="width: 100%; padding: 10px; border: 1px solid #dee2e6; border-radius: 6px;">
+                    </div>
+                </div>
+                <div style="margin-top: 20px; display: flex; gap: 10px; justify-content: flex-end;">
+                    <button onclick="app.closeModal()" class="btn" style="background: #6c757d;">Cancel</button>
+                    <button onclick="app.confirmAddTestingLineItem('${section}')" class="btn" style="background: #3b82f6;">✓ Add Item</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        setTimeout(() => modal.classList.add('show'), 10);
+        setTimeout(() => document.getElementById('testingDescription').focus(), 100);
+    },
+
+    async confirmAddTestingLineItem(section) {
+        const description = document.getElementById('testingDescription').value.trim();
+        const qty = parseFloat(document.getElementById('testingQty').value) || 1;
+        const cost = parseFloat(document.getElementById('testingCost').value) || 0;
+        const price = parseFloat(document.getElementById('testingPrice').value) || 0;
+
+        if (!description) {
+            alert('Please enter a description');
+            return;
+        }
+
+        if (!this.data.testingCalibration) this.data.testingCalibration = {};
+        if (!this.data.testingCalibration[section]) this.data.testingCalibration[section] = { lineItems: [] };
+
+        this.data.testingCalibration[section].lineItems.push({
+            id: Date.now(),
+            description,
+            qty,
+            cost,
+            price,
+            status: 'pending'
+        });
+
+        this.closeModal();
+        this.save();
+        await this.saveToDatabase(false);
+        this.renderTestingSections();
+        this.showNotification('✓ Line item added');
+    },
+
+    async updateTestingItemStatus(section, index, status) {
+        if (!this.data.testingCalibration?.[section]?.lineItems?.[index]) return;
+        
+        this.data.testingCalibration[section].lineItems[index].status = status;
+        this.save();
+        await this.saveToDatabase(false);
+        this.renderTestingSections();
+        this.showNotification('✓ Status updated');
+    },
+
+    async deleteTestingLineItem(section, index) {
+        if (!confirm('Delete this line item?')) return;
+        
+        if (!this.data.testingCalibration?.[section]?.lineItems) return;
+        this.data.testingCalibration[section].lineItems.splice(index, 1);
+        
+        this.save();
+        await this.saveToDatabase(false);
+        this.renderTestingSections();
+        this.showNotification('✓ Line item deleted');
+    },
+
+    // ===== MEETINGS =====
+    renderMeetings() {
+        this.renderGeneralMeetings();
+        this.renderCriticalJunctures();
+        this.renderPackageMeetings();
+    },
+
+    renderGeneralMeetings() {
+        const container = document.getElementById('generalMeetingsDisplay');
+        if (!container) return;
+
+        const meetings = this.data.meetings || [];
+
+        if (meetings.length === 0) {
+            container.innerHTML = '<p style="color: #999; font-style: italic;">No meetings scheduled yet.</p>';
+            return;
+        }
+
+        let html = '<div style="background: white; border: 1px solid #dee2e6; border-radius: 6px; overflow: hidden;">';
+        meetings.forEach((meeting, index) => {
+            const datetime = new Date(meeting.datetime);
+            html += `
+                <div style="padding: 15px; border-bottom: 1px solid #f0f0f0;">
+                    <div style="display: flex; justify-content: between; align-items: start; gap: 15px;">
+                        <div style="flex: 1;">
+                            <h4 style="margin: 0 0 8px 0; color: #333;">${meeting.title}</h4>
+                            <div style="font-size: 13px; color: #666; margin-bottom: 5px;">📅 ${datetime.toLocaleString()}</div>
+                            ${meeting.location ? `<div style="font-size: 13px; color: #666; margin-bottom: 5px;">📍 ${meeting.location}</div>` : ''}
+                            ${meeting.notes ? `<div style="font-size: 13px; color: #666; margin-top: 8px;">${meeting.notes}</div>` : ''}
+                        </div>
+                        <div style="display: flex; gap: 8px; flex-shrink: 0;">
+                            <button onclick="app.addToGoogleCalendar(${index}, 'general')" class="btn-header" style="background: #4285f4; font-size: 12px; padding: 6px 12px;">Google Cal</button>
+                            <button onclick="app.downloadICS(${index}, 'general')" class="btn-header" style="background: #22c55e; font-size: 12px; padding: 6px 12px;">Download .ics</button>
+                            <button onclick="app.deleteMeeting(${index}, 'general')" style="background: none; border: none; cursor: pointer; font-size: 16px; color: #dc3545;" title="Delete">🗑️</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+        html += '</div>';
+        container.innerHTML = html;
+    },
+
+    renderCriticalJunctures() {
+        const container = document.getElementById('criticalJuncturesDisplay');
+        if (!container) return;
+
+        const junctures = this.data.criticalJunctures || [];
+
+        if (junctures.length === 0) {
+            container.innerHTML = '<p style="color: #999; font-style: italic;">No critical junctures defined yet.</p>';
+            return;
+        }
+
+        let html = '<div style="background: #fff5f5; border: 2px solid #dc3545; border-radius: 6px; overflow: hidden;">';
+        junctures.forEach((juncture, index) => {
+            const date = new Date(juncture.date);
+            html += `
+                <div style="padding: 15px; border-bottom: 1px solid #fecaca;">
+                    <div style="display: flex; justify-content: space-between; align-items: start; gap: 15px;">
+                        <div style="flex: 1;">
+                            <div style="font-size: 14px; color: #dc3545; font-weight: 700; margin-bottom: 5px;">📅 ${date.toLocaleDateString()}</div>
+                            <div style="font-size: 14px; color: #333; margin-bottom: 5px;">${juncture.description}</div>
+                            ${juncture.assignedPerson ? `<div style="font-size: 12px; color: #666;">Assigned to: ${juncture.assignedPerson}</div>` : ''}
+                        </div>
+                        <button onclick="app.deleteCriticalJuncture(${index})" style="background: none; border: none; cursor: pointer; font-size: 16px; color: #dc3545;" title="Delete">🗑️</button>
+                    </div>
+                </div>
+            `;
+        });
+        html += '</div>';
+        container.innerHTML = html;
+    },
+
+    renderPackageMeetings() {
+        const container = document.getElementById('packageMeetingsDisplay');
+        if (!container) return;
+
+        const packages = [...new Set(this.data.items.map(item => item.category))];
+        const sectionMeetings = this.data.sectionMeetings || {};
+
+        if (packages.length === 0) {
+            container.innerHTML = '<p style="color: #666; margin-top: 30px;">Add equipment packages to create package-specific meetings.</p>';
+            return;
+        }
+
+        let html = '<h3 style="color: #495057; margin: 30px 0 15px 0;">Equipment Package Meetings</h3>';
+
+        packages.forEach(pkg => {
+            const meetings = sectionMeetings[pkg] || [];
+
+            html += `
+                <div class="category-section" style="margin-bottom: 15px;">
+                    <div class="category-header" style="cursor: default;">
+                        <span>${pkg}</span>
+                        <button class="btn-header" onclick="app.showAddMeetingModal('${pkg}')">+ Add Meeting</button>
+                    </div>
+                    <div style="border: 1px solid #dee2e6; border-top: none; border-radius: 0 0 6px 6px; background: white;">
+            `;
+
+            if (meetings.length === 0) {
+                html += '<p style="color: #999; font-style: italic; padding: 15px; margin: 0;">No meetings for this package.</p>';
+            } else {
+                meetings.forEach((meeting, index) => {
+                    const datetime = new Date(meeting.datetime);
+                    html += `
+                        <div style="padding: 15px; border-bottom: 1px solid #f0f0f0;">
+                            <div style="display: flex; justify-content: space-between; align-items: start; gap: 15px;">
+                                <div style="flex: 1;">
+                                    <h4 style="margin: 0 0 8px 0; color: #333; font-size: 14px;">${meeting.title}</h4>
+                                    <div style="font-size: 12px; color: #666; margin-bottom: 3px;">📅 ${datetime.toLocaleString()}</div>
+                                    ${meeting.location ? `<div style="font-size: 12px; color: #666; margin-bottom: 3px;">📍 ${meeting.location}</div>` : ''}
+                                    ${meeting.notes ? `<div style="font-size: 12px; color: #666; margin-top: 5px;">${meeting.notes}</div>` : ''}
+                                </div>
+                                <div style="display: flex; gap: 8px; flex-shrink: 0;">
+                                    <button onclick="app.addToGoogleCalendar(${index}, '${pkg}')" class="btn-header" style="background: #4285f4; font-size: 11px; padding: 5px 10px;">Google</button>
+                                    <button onclick="app.downloadICS(${index}, '${pkg}')" class="btn-header" style="background: #22c55e; font-size: 11px; padding: 5px 10px;">.ics</button>
+                                    <button onclick="app.deleteMeeting(${index}, '${pkg}')" style="background: none; border: none; cursor: pointer; font-size: 14px; color: #dc3545;" title="Delete">🗑️</button>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+
+            html += '</div></div>';
+        });
+
+        container.innerHTML = html;
+    },
+
+    showAddMeetingModal(type) {
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.innerHTML = `
+            <div class="modal-content" style="max-width: 600px;">
+                <h3>Add Meeting${type !== 'general' ? ` - ${type}` : ''}</h3>
+                <div class="form-group">
+                    <label>Meeting Title:</label>
+                    <input type="text" id="meetingTitle" placeholder="e.g., Site walkthrough" style="width: 100%; padding: 10px; border: 1px solid #dee2e6; border-radius: 6px;">
+                </div>
+                <div class="form-group">
+                    <label>Date & Time:</label>
+                    <input type="datetime-local" id="meetingDatetime" style="width: 100%; padding: 10px; border: 1px solid #dee2e6; border-radius: 6px;">
+                </div>
+                <div class="form-group">
+                    <label>Location:</label>
+                    <input type="text" id="meetingLocation" placeholder="e.g., Project site" style="width: 100%; padding: 10px; border: 1px solid #dee2e6; border-radius: 6px;">
+                </div>
+                <div class="form-group">
+                    <label>Notes (Optional):</label>
+                    <textarea id="meetingNotes" rows="3" placeholder="Any additional details..." style="width: 100%; padding: 10px; border: 1px solid #dee2e6; border-radius: 6px;"></textarea>
+                </div>
+                <div style="margin-top: 20px; display: flex; gap: 10px; justify-content: flex-end;">
+                    <button onclick="app.closeModal()" class="btn" style="background: #6c757d;">Cancel</button>
+                    <button onclick="app.confirmAddMeeting('${type}')" class="btn" style="background: #3b82f6;">✓ Add Meeting</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        setTimeout(() => modal.classList.add('show'), 10);
+        setTimeout(() => document.getElementById('meetingTitle').focus(), 100);
+    },
+
+    async confirmAddMeeting(type) {
+        const title = document.getElementById('meetingTitle').value.trim();
+        const datetime = document.getElementById('meetingDatetime').value;
+        const location = document.getElementById('meetingLocation').value.trim();
+        const notes = document.getElementById('meetingNotes').value.trim();
+
+        if (!title || !datetime) {
+            alert('Please enter a title and date/time');
+            return;
+        }
+
+        const newMeeting = {
+            id: Date.now(),
+            title,
+            datetime,
+            location,
+            notes,
+            createdAt: new Date().toISOString()
+        };
+
+        if (type === 'general') {
+            if (!this.data.meetings) this.data.meetings = [];
+            this.data.meetings.push(newMeeting);
+        } else {
+            if (!this.data.sectionMeetings) this.data.sectionMeetings = {};
+            if (!this.data.sectionMeetings[type]) this.data.sectionMeetings[type] = [];
+            this.data.sectionMeetings[type].push(newMeeting);
+        }
+
+        this.closeModal();
+        this.save();
+        await this.saveToDatabase(false);
+        this.renderMeetings();
+        this.showNotification('✓ Meeting added');
+    },
+
+    showAddCriticalJunctureModal() {
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.innerHTML = `
+            <div class="modal-content" style="max-width: 500px;">
+                <h3 style="color: #dc3545;">Add Critical Juncture</h3>
+                <div class="form-group">
+                    <label>Date:</label>
+                    <input type="date" id="junctureDate" style="width: 100%; padding: 10px; border: 1px solid #dee2e6; border-radius: 6px;">
+                </div>
+                <div class="form-group">
+                    <label>Description:</label>
+                    <input type="text" id="junctureDescription" placeholder="e.g., Tank testing - AB supervision required" style="width: 100%; padding: 10px; border: 1px solid #dee2e6; border-radius: 6px;">
+                </div>
+                <div class="form-group">
+                    <label>Assigned Person (Optional):</label>
+                    <input type="text" id="junctureAssigned" placeholder="Person responsible" style="width: 100%; padding: 10px; border: 1px solid #dee2e6; border-radius: 6px;">
+                </div>
+                <div style="margin-top: 20px; display: flex; gap: 10px; justify-content: flex-end;">
+                    <button onclick="app.closeModal()" class="btn" style="background: #6c757d;">Cancel</button>
+                    <button onclick="app.confirmAddCriticalJuncture()" class="btn" style="background: #dc3545;">✓ Add Juncture</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        setTimeout(() => modal.classList.add('show'), 10);
+        setTimeout(() => document.getElementById('junctureDate').focus(), 100);
+    },
+
+    async confirmAddCriticalJuncture() {
+        const date = document.getElementById('junctureDate').value;
+        const description = document.getElementById('junctureDescription').value.trim();
+        const assignedPerson = document.getElementById('junctureAssigned').value.trim();
+
+        if (!date || !description) {
+            alert('Please enter a date and description');
+            return;
+        }
+
+        if (!this.data.criticalJunctures) this.data.criticalJunctures = [];
+        this.data.criticalJunctures.push({
+            id: Date.now(),
+            date,
+            description,
+            assignedPerson,
+            createdAt: new Date().toISOString()
+        });
+
+        this.closeModal();
+        this.save();
+        await this.saveToDatabase(false);
+        this.renderCriticalJunctures();
+        this.showNotification('✓ Critical juncture added');
+    },
+
+    addToGoogleCalendar(index, type) {
+        const meeting = type === 'general' ? this.data.meetings[index] : this.data.sectionMeetings[type][index];
+        if (!meeting) return;
+
+        const startDate = new Date(meeting.datetime);
+        const endDate = new Date(startDate.getTime() + 60 * 60 * 1000); // 1 hour later
+
+        const formatDateForGoogle = (date) => {
+            return date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+        };
+
+        const params = new URLSearchParams({
+            action: 'TEMPLATE',
+            text: meeting.title,
+            dates: `${formatDateForGoogle(startDate)}/${formatDateForGoogle(endDate)}`,
+            details: meeting.notes || '',
+            location: meeting.location || ''
+        });
+
+        window.open(`https://calendar.google.com/calendar/render?${params.toString()}`, '_blank');
+    },
+
+    downloadICS(index, type) {
+        const meeting = type === 'general' ? this.data.meetings[index] : this.data.sectionMeetings[type][index];
+        if (!meeting) return;
+
+        const startDate = new Date(meeting.datetime);
+        const endDate = new Date(startDate.getTime() + 60 * 60 * 1000);
+
+        const formatDateForICS = (date) => {
+            return date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+        };
+
+        const icsContent = [
+            'BEGIN:VCALENDAR',
+            'VERSION:2.0',
+            'PRODID:-//FuelServicePro//Project Estimator//EN',
+            'BEGIN:VEVENT',
+            `UID:${meeting.id}@fuelservicepro.com`,
+            `DTSTAMP:${formatDateForICS(new Date())}`,
+            `DTSTART:${formatDateForICS(startDate)}`,
+            `DTEND:${formatDateForICS(endDate)}`,
+            `SUMMARY:${meeting.title}`,
+            meeting.location ? `LOCATION:${meeting.location}` : '',
+            meeting.notes ? `DESCRIPTION:${meeting.notes}` : '',
+            'END:VEVENT',
+            'END:VCALENDAR'
+        ].filter(Boolean).join('\r\n');
+
+        const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `${meeting.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.ics`;
+        link.click();
+    },
+
+    async deleteMeeting(index, type) {
+        if (!confirm('Delete this meeting?')) return;
+
+        if (type === 'general') {
+            this.data.meetings.splice(index, 1);
+        } else {
+            if (!this.data.sectionMeetings[type]) return;
+            this.data.sectionMeetings[type].splice(index, 1);
+        }
+
+        this.save();
+        await this.saveToDatabase(false);
+        this.renderMeetings();
+        this.showNotification('✓ Meeting deleted');
+    },
+
+    async deleteCriticalJuncture(index) {
+        if (!confirm('Delete this critical juncture?')) return;
+
+        this.data.criticalJunctures.splice(index, 1);
+        this.save();
+        await this.saveToDatabase(false);
+        this.renderCriticalJunctures();
+        this.showNotification('✓ Critical juncture deleted');
+    },
+
+    // ===== CALENDAR =====
+    renderCalendar() {
+        const container = document.getElementById('calendarGrid');
+        if (!container) return;
+
+        const year = this.calendarDate.getFullYear();
+        const month = this.calendarDate.getMonth();
+
+        document.getElementById('calendarMonthYear').textContent = this.calendarDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
+        const firstDay = new Date(year, month, 1).getDay();
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        let html = '<div style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px; background: #dee2e6; border: 1px solid #dee2e6; border-radius: 6px; overflow: hidden;">';
+
+        // Day headers
+        ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].forEach(day => {
+            html += `<div style="background: #f8f9fa; padding: 10px; text-align: center; font-weight: 600; font-size: 12px; color: #495057;">${day}</div>`;
+        });
+
+        // Empty cells for days before month starts
+        for (let i = 0; i < firstDay; i++) {
+            html += '<div style="background: #f8f9fa; min-height: 100px;"></div>';
+        }
+
+        // Days of month
+        for (let day = 1; day <= daysInMonth; day++) {
+            const date = new Date(year, month, day);
+            const dateStr = date.toISOString().split('T')[0];
+            const isToday = date.getTime() === today.getTime();
+            const events = this.getEventsForDate(dateStr);
+
+            html += `
+                <div style="background: white; min-height: 100px; padding: 8px; position: relative; cursor: pointer; ${isToday ? 'border: 2px solid #3b82f6;' : ''}" onclick="app.showDayEvents('${dateStr}')">
+                    <div style="font-weight: ${isToday ? '700' : '500'}; font-size: 14px; color: ${isToday ? '#3b82f6' : '#333'}; margin-bottom: 5px;">${day}</div>
+                    <div style="display: flex; flex-wrap: wrap; gap: 3px;">
+                        ${events.meetings > 0 ? `<span style="width: 8px; height: 8px; background: #3b82f6; border-radius: 50%;" title="${events.meetings} meeting(s)"></span>` : ''}
+                        ${events.testing > 0 ? `<span style="width: 8px; height: 8px; background: #22c55e; border-radius: 50%;" title="${events.testing} testing schedule(s)"></span>` : ''}
+                        ${events.junctures > 0 ? `<span style="width: 8px; height: 8px; background: #dc3545; border-radius: 50%;" title="${events.junctures} critical juncture(s)"></span>` : ''}
+                        ${events.todos > 0 ? `<span style="width: 8px; height: 8px; background: #f59e0b; border-radius: 50%;" title="${events.todos} todo deadline(s)"></span>` : ''}
+                    </div>
+                </div>
+            `;
+        }
+
+        html += '</div>';
+        container.innerHTML = html;
+    },
+
+    getEventsForDate(dateStr) {
+        const events = {
+            meetings: 0,
+            testing: 0,
+            junctures: 0,
+            todos: 0,
+            details: []
+        };
+
+        // Check general meetings
+        (this.data.meetings || []).forEach(meeting => {
+            if (meeting.datetime.startsWith(dateStr)) {
+                events.meetings++;
+                events.details.push({ type: 'meeting', title: meeting.title, data: meeting });
+            }
+        });
+
+        // Check section meetings
+        Object.values(this.data.sectionMeetings || {}).forEach(meetings => {
+            meetings.forEach(meeting => {
+                if (meeting.datetime.startsWith(dateStr)) {
+                    events.meetings++;
+                    events.details.push({ type: 'meeting', title: meeting.title, data: meeting });
+                }
+            });
+        });
+
+        // Check testing schedules
+        Object.entries(this.data.testingSchedules || {}).forEach(([section, schedule]) => {
+            if (schedule.scheduledDate === dateStr) {
+                events.testing++;
+                events.details.push({ type: 'testing', title: `${section} - Testing`, data: schedule });
+            } else if (schedule.startDate && schedule.endDate) {
+                const start = new Date(schedule.startDate);
+                const end = new Date(schedule.endDate);
+                const check = new Date(dateStr);
+                if (check >= start && check <= end) {
+                    events.testing++;
+                    events.details.push({ type: 'testing', title: `${section} - Testing`, data: schedule });
+                }
+            }
+        });
+
+        // Check critical junctures
+        (this.data.criticalJunctures || []).forEach(juncture => {
+            if (juncture.date === dateStr) {
+                events.junctures++;
+                events.details.push({ type: 'juncture', title: juncture.description, data: juncture });
+            }
+        });
+
+        // Check todo deadlines
+        (this.data.todos || []).forEach(todo => {
+            if (todo.deadline === dateStr && !todo.completed) {
+                events.todos++;
+                events.details.push({ type: 'todo', title: todo.text, data: todo });
+            }
+        });
+
+        Object.values(this.data.sectionTodos || {}).forEach(todos => {
+            todos.forEach(todo => {
+                if (todo.deadline === dateStr && !todo.completed) {
+                    events.todos++;
+                    events.details.push({ type: 'todo', title: todo.text, data: todo });
+                }
+            });
+        });
+
+        return events;
+    },
+
+    showDayEvents(dateStr) {
+        const events = this.getEventsForDate(dateStr);
+        const date = new Date(dateStr);
+
+        if (events.details.length === 0) {
+            return;
+        }
+
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        let html = `
+            <div class="modal-content" style="max-width: 600px;">
+                <h3>Events for ${date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</h3>
+                <div style="margin-top: 20px;">
+        `;
+
+        events.details.forEach(event => {
+            const colors = {
+                meeting: '#3b82f6',
+                testing: '#22c55e',
+                juncture: '#dc3545',
+                todo: '#f59e0b'
+            };
+
+            html += `
+                <div style="padding: 12px; margin-bottom: 10px; border-left: 4px solid ${colors[event.type]}; background: #f8f9fa; border-radius: 4px;">
+                    <div style="font-weight: 600; color: ${colors[event.type]}; font-size: 11px; text-transform: uppercase; margin-bottom: 5px;">
+                        ${event.type === 'meeting' ? '📅 Meeting' : event.type === 'testing' ? '🔬 Testing' : event.type === 'juncture' ? '🔴 Critical Juncture' : '📋 Todo Deadline'}
+                    </div>
+                    <div style="color: #333;">${event.title}</div>
+                </div>
+            `;
+        });
+
+        html += `
+                </div>
+                <div style="margin-top: 20px; display: flex; justify-content: flex-end;">
+                    <button onclick="app.closeModal()" class="btn" style="background: #6c757d;">Close</button>
+                </div>
+            </div>
+        `;
+
+        modal.innerHTML = html;
+        document.body.appendChild(modal);
+        setTimeout(() => modal.classList.add('show'), 10);
+    },
+
+    previousMonth() {
+        this.calendarDate.setMonth(this.calendarDate.getMonth() - 1);
+        this.renderCalendar();
+    },
+
+    nextMonth() {
+        this.calendarDate.setMonth(this.calendarDate.getMonth() + 1);
+        this.renderCalendar();
     },
 
     addItem() {
@@ -1900,6 +2841,12 @@ const app = {
             this.data.todos = job.todos || [];
             this.data.sectionTodos = job.section_todos || {};
             this.data.contractorAssignments = job.contractor_assignments || {};
+            this.data.meetings = job.meetings || [];
+            this.data.sectionMeetings = job.section_meetings || {};
+            this.data.criticalJunctures = job.critical_junctures || [];
+            this.data.testingCalibration = job.testing_calibration || {};
+            this.data.testingAssignments = job.testing_assignments || {};
+            this.data.testingSchedules = job.testing_schedules || {};
             this.data.items = job.items || [];
             
             console.log('Loaded files from database:', this.data.files);
