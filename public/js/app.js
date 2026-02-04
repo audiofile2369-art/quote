@@ -537,15 +537,20 @@ const app = {
             
             const wrapper = document.createElement('div');
             wrapper.className = 'category-section';
-            
+
             const header = document.createElement('div');
             header.className = 'category-header';
+            const showDeleteBtn = this.data.mode !== 'contractor';
             header.innerHTML = `
                 <div style="display:flex; align-items:center; gap:10px;">
                     <span>${sectionName}${contractorLabel}</span>
                 </div>
+                <div class="category-header-buttons">
+                    <button class="btn-header" onclick="app.editSectionScope('${sectionName}')">✏️ Edit</button>
+                    ${showDeleteBtn ? `<button class="btn-header btn-delete-section" onclick="app.deleteSectionScope('${sectionName}')">🗑️ Delete</button>` : ''}
+                </div>
             `;
-            
+
             const body = document.createElement('div');
             body.style.cssText = 'border:1px solid #dee2e6; border-top:none; border-radius:0 0 6px 6px; background:#fff; padding:15px;';
             body.innerHTML = `<div style="white-space:pre-wrap; color:#333; line-height:1.6;">${scopeText}</div>`;
@@ -1544,7 +1549,17 @@ const app = {
         this.closeModal();
         this.showNotification('✓ Scope of work saved to project!');
     },
-    
+
+    async deleteSectionScope(category) {
+        if (!confirm(`Delete scope of work for "${category}"?`)) return;
+
+        delete this.data.sectionScopes[category];
+        this.save();
+        await this.saveToDatabase(true);
+        this.renderSectionScopes();
+        this.showNotification(`✓ Scope of work deleted for "${category}"`);
+    },
+
     async saveSectionDisclaimers(category) {
         const text = document.getElementById('sectionDisclaimersText').value;
         this.data.sectionDisclaimers[category] = text;
