@@ -117,9 +117,20 @@ async function initDB() {
                 category VARCHAR(255),
                 description TEXT,
                 qty DECIMAL(10,2),
+                cost DECIMAL(10,2) DEFAULT 0,
                 price DECIMAL(10,2),
                 created_at TIMESTAMP DEFAULT NOW()
             )
+        `);
+
+        // Add cost column to job_items if it doesn't exist (for existing tables)
+        await client.query(`
+            DO $$
+            BEGIN
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='job_items' AND column_name='cost') THEN
+                    ALTER TABLE job_items ADD COLUMN cost DECIMAL(10,2) DEFAULT 0;
+                END IF;
+            END $$;
         `);
         
         // Equipment package templates (predefined package types)
@@ -347,6 +358,7 @@ app.get('/api/jobs/:id', async (req, res) => {
             category: item.category,
             description: item.description,
             qty: parseFloat(item.qty),
+            cost: parseFloat(item.cost) || 0,
             price: parseFloat(item.price)
         }));
 
@@ -403,9 +415,9 @@ app.post('/api/jobs', async (req, res) => {
         if (req.body.items && req.body.items.length > 0) {
             for (const item of req.body.items) {
                 await client.query(`
-                    INSERT INTO job_items (job_id, category, description, qty, price)
-                    VALUES ($1, $2, $3, $4, $5)
-                `, [jobId, item.category, item.description, item.qty, item.price]);
+                    INSERT INTO job_items (job_id, category, description, qty, cost, price)
+                    VALUES ($1, $2, $3, $4, $5, $6)
+                `, [jobId, item.category, item.description, item.qty, item.cost || 0, item.price]);
             }
         }
 
@@ -508,9 +520,9 @@ app.put('/api/jobs/:id', async (req, res) => {
         if (req.body.items && req.body.items.length > 0) {
             for (const item of req.body.items) {
                 await client.query(`
-                    INSERT INTO job_items (job_id, category, description, qty, price)
-                    VALUES ($1, $2, $3, $4, $5)
-                `, [req.params.id, item.category, item.description, item.qty, item.price]);
+                    INSERT INTO job_items (job_id, category, description, qty, cost, price)
+                    VALUES ($1, $2, $3, $4, $5, $6)
+                `, [req.params.id, item.category, item.description, item.qty, item.cost || 0, item.price]);
             }
         }
 
