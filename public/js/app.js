@@ -54,6 +54,7 @@ const app = {
     
     saveTimeout: null, // For debouncing auto-saves
     calendarDate: new Date(), // Current calendar view date
+    editingItemIndex: null, // Track which item is being edited
 
     // Format number as currency with commas (e.g., 1234.56 -> "1,234.56")
     formatCurrency(value) {
@@ -2146,10 +2147,29 @@ const app = {
 
     async removeItem(index) {
         this.data.items.splice(index, 1);
+        this.editingItemIndex = null; // Clear editing state
         this.renderItems();
         this.calculateTotals();
         this.save();
         await this.saveToDatabase(false);
+    },
+
+    editItemRow(index) {
+        this.editingItemIndex = index;
+        this.renderItems();
+        // Focus on description input after render
+        setTimeout(() => {
+            const input = document.getElementById(`desc-input-${index}`);
+            if (input) input.focus();
+        }, 50);
+    },
+
+    saveItemEdit(index) {
+        this.editingItemIndex = null;
+        this.renderItems();
+        this.calculateTotals();
+        this.save();
+        this.saveToDatabase(false);
     },
 
     async updateItem(index, field, value) {
@@ -2366,42 +2386,59 @@ const app = {
                 // In contractor mode, allow full editing within assigned sections; lock others
                 const isContractorSection = this.data.mode === 'contractor' && this.data.contractorSections.includes(category);
                 const readOnlyStyle = 'readonly style="background: #e9ecef; cursor: not-allowed;"';
-                const descReadonly = (this.data.mode === 'contractor' && !isContractorSection) ? readOnlyStyle : '';
-                const qtyReadonly = (this.data.mode === 'contractor' && !isContractorSection) ? readOnlyStyle : '';
-                const costReadonly = (this.data.mode === 'contractor' && !isContractorSection) ? readOnlyStyle : '';
-                const removeBtn = (this.data.mode !== 'contractor' || isContractorSection) ? `<button class="btn-remove" onclick="app.removeItem(${index})">×</button>` : '';
+                const canEdit = (this.data.mode !== 'contractor' || isContractorSection);
+                const removeBtn = canEdit ? `<button class="btn-remove" onclick="app.removeItem(${index})">×</button>` : '';
 
-                // Add autocomplete container for description input
-                const descInputId = `desc-input-${index}`;
+                // Check if this row is in edit mode
+                const isEditing = this.editingItemIndex === index;
 
                 // Format currency values
                 const formattedCost = this.formatCurrency(cost);
                 const formattedPrice = this.formatCurrency(price);
                 const formattedTotal = this.formatCurrency(total);
 
-                row.innerHTML = `
-                    <td style="position: relative;">
-                        <input type="text" id="${descInputId}" value="${escapedDesc}"
-                            onchange="app.updateItem(${index}, 'description', this.value)"
-                            oninput="app.showAutocomplete(this, ${index})"
-                            onfocus="app.showAutocomplete(this, ${index})"
-                            onblur="setTimeout(() => app.hideAutocomplete(${index}), 200)"
-                            autocomplete="off"
-                            ${descReadonly}>
-                        <div id="autocomplete-${index}" class="autocomplete-dropdown" style="display: none;"></div>
-                    </td>
-                    <td><input type="number" value="${item.qty || 0}" step="1" min="0" onchange="app.updateItem(${index}, 'qty', this.value)" ${qtyReadonly}></td>
-                    <td><input type="text" value="${formattedCost}"
-                        onfocus="this.value = app.parseCurrency(this.value) || ''"
-                        onblur="this.value = app.formatCurrency(this.value); app.updateItemCost(${index}, '${category}', app.parseCurrency(this.value))"
-                        ${costReadonly} style="background: #fffbeb; text-align: right;"></td>
-                    <td><input type="text" value="${formattedPrice}"
-                        onfocus="this.value = app.parseCurrency(this.value) || ''"
-                        onblur="this.value = app.formatCurrency(this.value); app.updateItem(${index}, 'price', app.parseCurrency(this.value))"
-                        style="text-align: right;"></td>
-                    <td><input type="text" value="$${formattedTotal}" readonly style="text-align: right;"></td>
-                    <td>${removeBtn}</td>
-                `;
+                if (isEditing && canEdit) {
+                    // EDIT MODE: Show input fields
+                    const descInputId = `desc-input-${index}`;
+                    row.innerHTML = `
+                        <td style="position: relative;">
+                            <input type="text" id="${descInputId}" value="${escapedDesc}"
+                                onchange="app.updateItem(${index}, 'description', this.value)"
+                                oninput="app.showAutocomplete(this, ${index})"
+                                onfocus="app.showAutocomplete(this, ${index})"
+                                onblur="setTimeout(() => app.hideAutocomplete(${index}), 200)"
+                                autocomplete="off">
+                            <div id="autocomplete-${index}" class="autocomplete-dropdown" style="display: none;"></div>
+                        </td>
+                        <td><input type="number" value="${item.qty || 0}" step="1" min="0" onchange="app.updateItem(${index}, 'qty', this.value)"></td>
+                        <td><input type="text" value="${formattedCost}"
+                            onfocus="this.value = app.parseCurrency(this.value) || ''"
+                            onblur="this.value = app.formatCurrency(this.value); app.updateItemCost(${index}, '${category}', app.parseCurrency(this.value))"
+                            style="background: #fffbeb; text-align: right;"></td>
+                        <td><input type="text" value="${formattedPrice}"
+                            onfocus="this.value = app.parseCurrency(this.value) || ''"
+                            onblur="this.value = app.formatCurrency(this.value); app.updateItem(${index}, 'price', app.parseCurrency(this.value))"
+                            style="text-align: right;"></td>
+                        <td><input type="text" value="$${formattedTotal}" readonly style="text-align: right;"></td>
+                        <td style="white-space: nowrap;">
+                            <button onclick="app.saveItemEdit(${index})" style="background: #22c55e; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 14px; margin-right: 4px;" title="Save">✓</button>
+                            ${removeBtn}
+                        </td>
+                    `;
+                } else {
+                    // VIEW MODE: Show text with wrapping, edit button
+                    row.innerHTML = `
+                        <td style="white-space: pre-wrap; word-wrap: break-word; padding: 10px;">${item.description || ''}</td>
+                        <td style="text-align: center;">${item.qty || 0}</td>
+                        <td style="text-align: right; color: #6b7280;">$${formattedCost}</td>
+                        <td style="text-align: right;">$${formattedPrice}</td>
+                        <td style="text-align: right; font-weight: 600;">$${formattedTotal}</td>
+                        <td style="white-space: nowrap;">
+                            ${canEdit ? `<button onclick="app.editItemRow(${index})" style="background: #3b82f6; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 14px; margin-right: 4px;" title="Edit">✏️</button>` : ''}
+                            ${removeBtn}
+                        </td>
+                    `;
+                }
                 tbody.appendChild(row);
             });
             

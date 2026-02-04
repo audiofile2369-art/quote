@@ -227,6 +227,7 @@ async function initDB() {
         const packageCount = await client.query('SELECT COUNT(*) FROM package_templates');
         if (parseInt(packageCount.rows[0].count) === 0) {
             const defaultPackages = [
+                'Tank and Excavation',
                 'Forecourt Island Equipment',
                 'Forecourt Submerged Pump Package',
                 'Tank',
@@ -249,6 +250,7 @@ async function initDB() {
         } else {
             // Ensure all default packages exist (migration for existing databases)
             const requiredPackages = [
+                'Tank and Excavation',
                 'Forecourt Island Equipment',
                 'Forecourt Submerged Pump Package',
                 'Tank',
