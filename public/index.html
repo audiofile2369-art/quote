@@ -35,6 +35,7 @@
             <button class="tab" onclick="app.switchTab('items')">Equipment Packages</button>
             <button class="tab" onclick="app.switchTab('scope')">Scope of Work</button>
             <button class="tab" onclick="app.switchTab('disclaimers')">Disclaimers</button>
+            <button class="tab" onclick="app.switchTab('todos')">Todo List</button>
             <button class="tab" onclick="app.switchTab('summary')">Summary</button>
         </div>
 
@@ -229,6 +230,28 @@
             </div>
 
             <div id="sectionDisclaimersDisplay"></div>
+        </div>
+
+        <!-- TAB: Todo List -->
+        <div id="tab-todos" class="tab-content">
+            <h2>Todo List</h2>
+
+            <div class="info-banner">
+                <strong>📋 Tasks:</strong> Track general tasks and equipment package specific todos. Click the checkbox to mark complete with a timestamp.
+            </div>
+
+            <div class="form-group">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                    <label style="margin: 0;">General Todo Items</label>
+                </div>
+                <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                    <input type="text" id="newTodoInput" placeholder="Enter a new todo item..." style="flex: 1;" onkeypress="if(event.key === 'Enter') app.addGeneralTodo()">
+                    <button onclick="app.addGeneralTodo()" class="btn" style="background: #28a745; color: white; padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">+ Add Todo</button>
+                </div>
+                <div id="generalTodosDisplay"></div>
+            </div>
+
+            <div id="sectionTodosDisplay"></div>
         </div>
     </div>
 

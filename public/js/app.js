@@ -22,6 +22,8 @@ const app = {
         sectionDisclaimers: {}, // { 'package': 'disclaimer text' }
         contractorSectionDisclaimers: {}, // { 'package': { 'contractorName': 'disclaimer text' } }
         sectionUpcharges: {}, // { 'package': 15 } - percentage upcharge for cost -> price calculation
+        todos: [], // [{ id, text, completed, completedAt }] - general todos
+        sectionTodos: {}, // { 'package': [{ id, text, completed, completedAt }] }
         contractorAssignments: {}, // { 'contractorName': ['Package A', 'Package B'] }
         mode: 'owner', // 'owner' or 'contractor'
         contractorName: null, // contractor viewing this
@@ -34,6 +36,18 @@ const app = {
     lineItemTemplates: [],
     
     saveTimeout: null, // For debouncing auto-saves
+
+    // Format number as currency with commas (e.g., 1234.56 -> "1,234.56")
+    formatCurrency(value) {
+        const num = parseFloat(value) || 0;
+        return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    },
+
+    // Parse currency string back to number (e.g., "1,234.56" -> 1234.56)
+    parseCurrency(value) {
+        if (typeof value === 'number') return value;
+        return parseFloat(String(value).replace(/,/g, '')) || 0;
+    },
 
     async init() {
         // Set today's date
@@ -197,6 +211,8 @@ const app = {
             sectionDisclaimers: {},
             contractorSectionDisclaimers: {},
             sectionUpcharges: {},
+            todos: [],
+            sectionTodos: {},
             contractorAssignments: {},
             mode: 'owner',
             contractorName: null,
@@ -491,11 +507,13 @@ const app = {
             }
         });
         
-        // Refresh section scopes/disclaimers when switching to those tabs
+        // Refresh section scopes/disclaimers/todos when switching to those tabs
         if (tabName === 'scope') {
             this.renderSectionScopes();
         } else if (tabName === 'disclaimers') {
             this.renderSectionDisclaimers();
+        } else if (tabName === 'todos') {
+            this.renderTodos();
         }
     },
 
@@ -811,6 +829,243 @@ const app = {
         await this.saveToDatabase(true);
         this.renderSectionDisclaimers();
         this.showNotification(`✓ Disclaimers deleted for "${category}"`);
+    },
+
+    // ============ TODO LIST ============
+
+    renderTodos() {
+        this.renderGeneralTodos();
+        this.renderSectionTodos();
+    },
+
+    renderGeneralTodos() {
+        const container = document.getElementById('generalTodosDisplay');
+        if (!container) return;
+
+        const todos = this.data.todos || [];
+
+        if (todos.length === 0) {
+            container.innerHTML = '<p style="color: #999; font-style: italic;">No general todos yet. Add one above.</p>';
+            return;
+        }
+
+        let html = '<div style="background: white; border: 1px solid #dee2e6; border-radius: 6px; overflow: hidden;">';
+        todos.forEach((todo, index) => {
+            const isCompleted = todo.completed;
+            const completedDate = todo.completedAt ? new Date(todo.completedAt).toLocaleString() : '';
+            html += `
+                <div style="display: flex; align-items: center; gap: 12px; padding: 12px 15px; border-bottom: 1px solid #f0f0f0; ${isCompleted ? 'background: #f0fdf4;' : ''}">
+                    <input type="checkbox" ${isCompleted ? 'checked' : ''}
+                        onclick="app.showCompleteTodoModal('general', ${index})"
+                        style="width: 20px; height: 20px; cursor: pointer;">
+                    <div style="flex: 1; ${isCompleted ? 'text-decoration: line-through; color: #6b7280;' : ''}">
+                        ${todo.text}
+                        ${isCompleted ? `<div style="font-size: 11px; color: #22c55e; margin-top: 2px;">Completed: ${completedDate}</div>` : ''}
+                    </div>
+                    <button onclick="app.editTodo('general', ${index})" style="background: none; border: none; cursor: pointer; font-size: 16px;" title="Edit">✏️</button>
+                    <button onclick="app.deleteTodo('general', ${index})" style="background: none; border: none; cursor: pointer; font-size: 16px; color: #dc3545;" title="Delete">🗑️</button>
+                </div>
+            `;
+        });
+        html += '</div>';
+        container.innerHTML = html;
+    },
+
+    renderSectionTodos() {
+        const container = document.getElementById('sectionTodosDisplay');
+        if (!container) return;
+
+        // Get all equipment packages
+        const packages = [...new Set(this.data.items.map(item => item.category))];
+        const sectionTodos = this.data.sectionTodos || {};
+
+        if (packages.length === 0) {
+            container.innerHTML = '<p style="color: #666; margin-top: 30px;">Add equipment packages to create package-specific todos.</p>';
+            return;
+        }
+
+        let html = '<h3 style="color: #495057; margin: 30px 0 15px 0;">Equipment Package Todos</h3>';
+
+        packages.forEach(pkg => {
+            const todos = sectionTodos[pkg] || [];
+            const completedCount = todos.filter(t => t.completed).length;
+
+            html += `
+                <div class="category-section" style="margin-bottom: 15px;">
+                    <div class="category-header" style="cursor: default;">
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <span>${pkg}</span>
+                            <span style="font-size: 12px; color: #6b7280; font-weight: normal;">(${completedCount}/${todos.length} completed)</span>
+                        </div>
+                        <button class="btn-header" onclick="app.addSectionTodo('${pkg}')">+ Add Todo</button>
+                    </div>
+                    <div style="border: 1px solid #dee2e6; border-top: none; border-radius: 0 0 6px 6px; background: white;">
+            `;
+
+            if (todos.length === 0) {
+                html += '<p style="color: #999; font-style: italic; padding: 15px; margin: 0;">No todos for this package.</p>';
+            } else {
+                todos.forEach((todo, index) => {
+                    const isCompleted = todo.completed;
+                    const completedDate = todo.completedAt ? new Date(todo.completedAt).toLocaleString() : '';
+                    html += `
+                        <div style="display: flex; align-items: center; gap: 12px; padding: 12px 15px; border-bottom: 1px solid #f0f0f0; ${isCompleted ? 'background: #f0fdf4;' : ''}">
+                            <input type="checkbox" ${isCompleted ? 'checked' : ''}
+                                onclick="app.showCompleteTodoModal('${pkg}', ${index})"
+                                style="width: 20px; height: 20px; cursor: pointer;">
+                            <div style="flex: 1; ${isCompleted ? 'text-decoration: line-through; color: #6b7280;' : ''}">
+                                ${todo.text}
+                                ${isCompleted ? `<div style="font-size: 11px; color: #22c55e; margin-top: 2px;">Completed: ${completedDate}</div>` : ''}
+                            </div>
+                            <button onclick="app.editTodo('${pkg}', ${index})" style="background: none; border: none; cursor: pointer; font-size: 16px;" title="Edit">✏️</button>
+                            <button onclick="app.deleteTodo('${pkg}', ${index})" style="background: none; border: none; cursor: pointer; font-size: 16px; color: #dc3545;" title="Delete">🗑️</button>
+                        </div>
+                    `;
+                });
+            }
+
+            html += '</div></div>';
+        });
+
+        container.innerHTML = html;
+    },
+
+    async addGeneralTodo() {
+        const input = document.getElementById('newTodoInput');
+        const text = input.value.trim();
+        if (!text) return;
+
+        if (!this.data.todos) this.data.todos = [];
+        this.data.todos.push({
+            id: Date.now(),
+            text: text,
+            completed: false,
+            completedAt: null
+        });
+
+        input.value = '';
+        this.save();
+        await this.saveToDatabase(false);
+        this.renderGeneralTodos();
+        this.showNotification('✓ Todo added');
+    },
+
+    addSectionTodo(category) {
+        const text = prompt(`Add todo for "${category}":`);
+        if (!text || !text.trim()) return;
+
+        if (!this.data.sectionTodos) this.data.sectionTodos = {};
+        if (!this.data.sectionTodos[category]) this.data.sectionTodos[category] = [];
+
+        this.data.sectionTodos[category].push({
+            id: Date.now(),
+            text: text.trim(),
+            completed: false,
+            completedAt: null
+        });
+
+        this.save();
+        this.saveToDatabase(false);
+        this.renderSectionTodos();
+        this.showNotification('✓ Todo added');
+    },
+
+    showCompleteTodoModal(category, index) {
+        const isGeneral = category === 'general';
+        const todos = isGeneral ? this.data.todos : (this.data.sectionTodos[category] || []);
+        const todo = todos[index];
+
+        if (!todo) return;
+
+        // If already completed, toggle it off
+        if (todo.completed) {
+            todo.completed = false;
+            todo.completedAt = null;
+            this.save();
+            this.saveToDatabase(false);
+            this.renderTodos();
+            return;
+        }
+
+        // Show completion modal with datetime picker
+        const now = new Date();
+        const dateStr = now.toISOString().slice(0, 16); // Format for datetime-local input
+
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.innerHTML = `
+            <div class="modal-content" style="max-width: 400px;">
+                <h3>✅ Mark Todo Complete</h3>
+                <p style="color: #666; margin-bottom: 15px;">"${todo.text}"</p>
+                <div class="form-group">
+                    <label>Completion Date/Time:</label>
+                    <input type="datetime-local" id="completionDateTime" value="${dateStr}" style="width: 100%; padding: 10px; border: 1px solid #dee2e6; border-radius: 6px;">
+                </div>
+                <div style="margin-top: 20px; display: flex; gap: 10px; justify-content: flex-end;">
+                    <button onclick="app.closeModal()" class="btn" style="background: #6c757d;">Cancel</button>
+                    <button onclick="app.confirmCompleteTodo('${category}', ${index})" class="btn" style="background: #22c55e;">✓ Confirm Complete</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        setTimeout(() => modal.classList.add('show'), 10);
+    },
+
+    async confirmCompleteTodo(category, index) {
+        const dateInput = document.getElementById('completionDateTime');
+        const completedAt = dateInput ? new Date(dateInput.value).toISOString() : new Date().toISOString();
+
+        const isGeneral = category === 'general';
+        const todos = isGeneral ? this.data.todos : (this.data.sectionTodos[category] || []);
+        const todo = todos[index];
+
+        if (todo) {
+            todo.completed = true;
+            todo.completedAt = completedAt;
+        }
+
+        this.closeModal();
+        this.save();
+        await this.saveToDatabase(false);
+        this.renderTodos();
+        this.showNotification('✓ Todo marked complete');
+    },
+
+    editTodo(category, index) {
+        const isGeneral = category === 'general';
+        const todos = isGeneral ? this.data.todos : (this.data.sectionTodos[category] || []);
+        const todo = todos[index];
+
+        if (!todo) return;
+
+        const newText = prompt('Edit todo:', todo.text);
+        if (newText === null) return; // Cancelled
+        if (!newText.trim()) {
+            alert('Todo text cannot be empty');
+            return;
+        }
+
+        todo.text = newText.trim();
+        this.save();
+        this.saveToDatabase(false);
+        this.renderTodos();
+        this.showNotification('✓ Todo updated');
+    },
+
+    async deleteTodo(category, index) {
+        if (!confirm('Delete this todo?')) return;
+
+        const isGeneral = category === 'general';
+        if (isGeneral) {
+            this.data.todos.splice(index, 1);
+        } else {
+            this.data.sectionTodos[category].splice(index, 1);
+        }
+
+        this.save();
+        await this.saveToDatabase(false);
+        this.renderTodos();
+        this.showNotification('✓ Todo deleted');
     },
 
     addItem() {
@@ -1178,6 +1433,11 @@ const app = {
                 // Add autocomplete container for description input
                 const descInputId = `desc-input-${index}`;
 
+                // Format currency values
+                const formattedCost = this.formatCurrency(cost);
+                const formattedPrice = this.formatCurrency(price);
+                const formattedTotal = this.formatCurrency(total);
+
                 row.innerHTML = `
                     <td style="position: relative;">
                         <input type="text" id="${descInputId}" value="${escapedDesc}"
@@ -1190,9 +1450,15 @@ const app = {
                         <div id="autocomplete-${index}" class="autocomplete-dropdown" style="display: none;"></div>
                     </td>
                     <td><input type="number" value="${item.qty || 0}" step="1" min="0" onchange="app.updateItem(${index}, 'qty', this.value)" ${qtyReadonly}></td>
-                    <td><input type="number" value="${cost}" step="0.01" min="0" onchange="app.updateItemCost(${index}, '${category}', this.value)" ${costReadonly} style="background: #fffbeb;"></td>
-                    <td><input type="number" value="${price}" step="0.01" min="0" onchange="app.updateItem(${index}, 'price', this.value)"></td>
-                    <td><input type="text" value="$${total.toFixed(2)}" readonly></td>
+                    <td><input type="text" value="${formattedCost}"
+                        onfocus="this.value = app.parseCurrency(this.value) || ''"
+                        onblur="this.value = app.formatCurrency(this.value); app.updateItemCost(${index}, '${category}', app.parseCurrency(this.value))"
+                        ${costReadonly} style="background: #fffbeb; text-align: right;"></td>
+                    <td><input type="text" value="${formattedPrice}"
+                        onfocus="this.value = app.parseCurrency(this.value) || ''"
+                        onblur="this.value = app.formatCurrency(this.value); app.updateItem(${index}, 'price', app.parseCurrency(this.value))"
+                        style="text-align: right;"></td>
+                    <td><input type="text" value="$${formattedTotal}" readonly style="text-align: right;"></td>
                     <td>${removeBtn}</td>
                 `;
                 tbody.appendChild(row);
@@ -1216,13 +1482,13 @@ const app = {
             if (this.data.mode !== 'contractor' && sectionCostTotal > 0) {
                 sectionTotalDiv.innerHTML = `
                     <div style="display: flex; gap: 20px;">
-                        <span>Cost: <span style="color: #6b7280;">$${sectionCostTotal.toFixed(2)}</span></span>
-                        <span>Profit: <span style="color: #22c55e;">$${sectionProfit.toFixed(2)}</span></span>
+                        <span>Cost: <span style="color: #6b7280;">$${this.formatCurrency(sectionCostTotal)}</span></span>
+                        <span>Profit: <span style="color: #22c55e;">$${this.formatCurrency(sectionProfit)}</span></span>
                     </div>
-                    <div>Section Total: <span style="color: #f97316; font-size: 18px;">$${sectionTotal.toFixed(2)}</span></div>
+                    <div>Section Total: <span style="color: #f97316; font-size: 18px;">$${this.formatCurrency(sectionTotal)}</span></div>
                 `;
             } else {
-                sectionTotalDiv.innerHTML = `<div style="text-align: right; width: 100%;">Section Total: <span style="color: #f97316; font-size: 18px;">$${sectionTotal.toFixed(2)}</span></div>`;
+                sectionTotalDiv.innerHTML = `<div style="text-align: right; width: 100%;">Section Total: <span style="color: #f97316; font-size: 18px;">$${this.formatCurrency(sectionTotal)}</span></div>`;
             }
             section.appendChild(sectionTotalDiv);
             
@@ -1362,53 +1628,65 @@ const app = {
     },
 
     calculateTotals() {
-        // Group items by category
+        // Group items by category (both price and cost)
         const categories = {};
+        const categoryCosts = {};
         this.data.items.forEach(item => {
             const cat = item.category || 'Uncategorized';
             if (!categories[cat]) categories[cat] = 0;
+            if (!categoryCosts[cat]) categoryCosts[cat] = 0;
             categories[cat] += (item.qty || 0) * (item.price || 0);
+            categoryCosts[cat] += (item.qty || 0) * (item.cost || 0);
         });
-        
+
         const subtotal = this.data.items.reduce((sum, item) => {
             return sum + ((item.qty || 0) * (item.price || 0));
         }, 0);
-        
+
+        const totalCost = this.data.items.reduce((sum, item) => {
+            return sum + ((item.qty || 0) * (item.cost || 0));
+        }, 0);
+
         const taxRate = parseFloat(document.getElementById('taxRate')?.value || 0) / 100;
         const discount = parseFloat(document.getElementById('discount')?.value || 0);
-        
+
         const taxAmount = subtotal * taxRate;
         const grandTotal = subtotal + taxAmount - discount;
-        
-        document.getElementById('subtotal').textContent = '$' + subtotal.toFixed(2);
-        document.getElementById('taxAmount').textContent = '$' + taxAmount.toFixed(2);
-        document.getElementById('grandTotal').textContent = '$' + grandTotal.toFixed(2);
-        
+
+        document.getElementById('subtotal').textContent = '$' + this.formatCurrency(subtotal);
+        document.getElementById('taxAmount').textContent = '$' + this.formatCurrency(taxAmount);
+        document.getElementById('grandTotal').textContent = '$' + this.formatCurrency(grandTotal);
+
         this.data.taxRate = taxRate * 100;
         this.data.discount = discount;
-        
+
         // Render section breakdown on summary page
-        this.renderSectionBreakdown(categories, subtotal);
+        this.renderSectionBreakdown(categories, categoryCosts, subtotal, totalCost);
     },
     
-    renderSectionBreakdown(categories, subtotal) {
+    renderSectionBreakdown(categories, categoryCosts, subtotal, totalCost) {
         const container = document.getElementById('sectionBreakdown');
         if (!container) return;
-        
+
         const sortedCategories = Object.entries(categories).sort((a, b) => b[1] - a[1]);
-        
+
         if (sortedCategories.length === 0) {
             container.innerHTML = '';
             return;
         }
-        
-        let html = '<h3 style="color: #495057; margin-bottom: 15px;">Cost Breakdown by Section</h3>';
+
+        const totalProfit = subtotal - totalCost;
+        const profitMargin = subtotal > 0 ? (totalProfit / subtotal * 100).toFixed(1) : 0;
+
+        let html = '<h3 style="color: #495057; margin-bottom: 15px;">Price Breakdown by Section</h3>';
         html += '<div style="background: white; border-radius: 8px; overflow: hidden; border: 1px solid #dee2e6;">';
-        
+
         sortedCategories.forEach(([category, total], index) => {
+            const cost = categoryCosts[category] || 0;
+            const profit = total - cost;
             const percentage = subtotal > 0 ? (total / subtotal * 100).toFixed(1) : 0;
             const isLast = index === sortedCategories.length - 1;
-            
+
             html += `
                 <div style="display: flex; justify-content: space-between; align-items: center; padding: 15px 20px; ${!isLast ? 'border-bottom: 1px solid #f0f0f0;' : ''}">
                     <div style="flex: 1;">
@@ -1419,13 +1697,36 @@ const app = {
                             </div>
                             <span style="font-size: 13px; color: #6c757d; min-width: 50px;">${percentage}%</span>
                         </div>
+                        ${this.data.mode !== 'contractor' && cost > 0 ? `
+                            <div style="font-size: 12px; color: #6b7280; margin-top: 5px;">
+                                Cost: $${this.formatCurrency(cost)} | Profit: <span style="color: #22c55e;">$${this.formatCurrency(profit)}</span>
+                            </div>
+                        ` : ''}
                     </div>
-                    <div style="font-weight: 600; font-size: 18px; color: #f97316; min-width: 120px; text-align: right;">$${total.toFixed(2)}</div>
+                    <div style="font-weight: 600; font-size: 18px; color: #f97316; min-width: 120px; text-align: right;">$${this.formatCurrency(total)}</div>
                 </div>
             `;
         });
-        
+
         html += '</div>';
+
+        // Add totals summary if there's cost data (owner mode only)
+        if (this.data.mode !== 'contractor' && totalCost > 0) {
+            html += `
+                <div style="margin-top: 20px; padding: 15px 20px; background: #f0fdf4; border: 1px solid #22c55e; border-radius: 8px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <div style="font-weight: 600; color: #166534; margin-bottom: 5px;">Total Profit Summary</div>
+                            <div style="font-size: 14px; color: #6b7280;">
+                                Total Cost: $${this.formatCurrency(totalCost)} | Profit Margin: ${profitMargin}%
+                            </div>
+                        </div>
+                        <div style="font-weight: 700; font-size: 24px; color: #22c55e;">$${this.formatCurrency(totalProfit)}</div>
+                    </div>
+                </div>
+            `;
+        }
+
         container.innerHTML = html;
     },
 
@@ -1596,6 +1897,8 @@ const app = {
             this.data.sectionDisclaimers = job.section_disclaimers || {};
             this.data.contractorSectionDisclaimers = job.contractor_section_disclaimers || {};
             this.data.sectionUpcharges = job.section_upcharges || {};
+            this.data.todos = job.todos || [];
+            this.data.sectionTodos = job.section_todos || {};
             this.data.contractorAssignments = job.contractor_assignments || {};
             this.data.items = job.items || [];
             
@@ -2089,12 +2392,20 @@ const app = {
 
     generatePDF() {
         this.save();
-        
-        const subtotal = this.data.items.reduce((sum, item) => sum + (item.qty * item.price), 0);
+
+        // Calculate category totals for breakdown
+        const categoryTotals = {};
+        this.data.items.forEach(item => {
+            const cat = item.category || 'Uncategorized';
+            if (!categoryTotals[cat]) categoryTotals[cat] = 0;
+            categoryTotals[cat] += (item.qty || 0) * (item.price || 0);
+        });
+
+        const subtotal = this.data.items.reduce((sum, item) => sum + ((item.qty || 0) * (item.price || 0)), 0);
         const taxAmount = subtotal * (this.data.taxRate / 100);
         const grandTotal = subtotal + taxAmount - this.data.discount;
-        
-        // Build line items table with categories
+
+        // Build line items table with categories and section totals
         const tableBody = [
             [
                 { text: 'Description', style: 'tableHeader' },
@@ -2103,47 +2414,87 @@ const app = {
                 { text: 'Total', style: 'tableHeader', alignment: 'right' }
             ]
         ];
-        
+
         let currentCategory = '';
-        this.data.items.forEach(item => {
-            // Add category header
+        let categoryItems = [];
+
+        this.data.items.forEach((item, idx) => {
+            // If category changed, add section total for previous category
             if (item.category && item.category !== currentCategory) {
+                // Add section total for previous category
+                if (currentCategory && categoryTotals[currentCategory]) {
+                    tableBody.push([
+                        { text: `${currentCategory} Total:`, colSpan: 3, bold: true, alignment: 'right', fillColor: '#f8f9fa' },
+                        {},
+                        {},
+                        { text: '$' + this.formatCurrency(categoryTotals[currentCategory]), bold: true, alignment: 'right', fillColor: '#f8f9fa' }
+                    ]);
+                }
+
                 currentCategory = item.category;
                 tableBody.push([
-                    { text: currentCategory, colSpan: 4, bold: true, color: '#c41e3a', fillColor: '#f8f9fa', margin: [0, 5, 0, 5] },
+                    { text: currentCategory, colSpan: 4, bold: true, color: '#c41e3a', fillColor: '#e8e8e8', margin: [0, 8, 0, 5] },
                     {},
                     {},
                     {}
                 ]);
             }
-            
-            const total = item.qty * item.price;
+
+            const total = (item.qty || 0) * (item.price || 0);
             tableBody.push([
-                item.description,
-                { text: item.qty.toString(), alignment: 'center' },
-                { text: '$' + item.price.toFixed(2), alignment: 'right' },
-                { text: '$' + total.toFixed(2), alignment: 'right' }
+                item.description || '',
+                { text: (item.qty || 0).toString(), alignment: 'center' },
+                { text: '$' + this.formatCurrency(item.price || 0), alignment: 'right' },
+                { text: '$' + this.formatCurrency(total), alignment: 'right' }
             ]);
         });
-        
+
+        // Add final section total
+        if (currentCategory && categoryTotals[currentCategory]) {
+            tableBody.push([
+                { text: `${currentCategory} Total:`, colSpan: 3, bold: true, alignment: 'right', fillColor: '#f8f9fa' },
+                {},
+                {},
+                { text: '$' + this.formatCurrency(categoryTotals[currentCategory]), bold: true, alignment: 'right', fillColor: '#f8f9fa' }
+            ]);
+        }
+
+        // Build price breakdown by section
+        const breakdownBody = [
+            [{ text: 'Equipment Package', style: 'tableHeader' }, { text: 'Amount', style: 'tableHeader', alignment: 'right' }]
+        ];
+        Object.entries(categoryTotals).sort((a, b) => b[1] - a[1]).forEach(([cat, total]) => {
+            breakdownBody.push([cat, { text: '$' + this.formatCurrency(total), alignment: 'right' }]);
+        });
+
         const docDefinition = {
             pageSize: 'LETTER',
             pageMargins: [40, 60, 40, 60],
-            
+
             content: [
                 { text: 'QUOTE', style: 'title', alignment: 'center' },
                 { text: this.data.companyName || 'Your Company', style: 'company', alignment: 'center' },
                 { text: `${this.data.phone} | ${this.data.email}`, style: 'contact', alignment: 'center' },
                 { text: '\n' },
-                
+
                 { text: 'Prepared For:', style: 'sectionHeader' },
                 { text: this.data.clientName || '[Client Name]', bold: true },
                 { text: this.data.siteAddress || '[Site Address]' },
                 { text: `Date: ${this.data.quoteDate || new Date().toISOString().split('T')[0]}` },
                 { text: `Quote #: ${this.data.quoteNumber || 'N/A'}` },
                 { text: '\n' },
-                
-                { text: 'LINE ITEMS', style: 'sectionHeader' },
+
+                { text: 'PRICE BREAKDOWN BY PACKAGE', style: 'sectionHeader' },
+                {
+                    table: {
+                        widths: ['*', 100],
+                        body: breakdownBody
+                    },
+                    layout: 'lightHorizontalLines'
+                },
+                { text: '\n' },
+
+                { text: 'DETAILED LINE ITEMS', style: 'sectionHeader' },
                 {
                     table: {
                         widths: ['*', 50, 80, 80],
@@ -2152,34 +2503,34 @@ const app = {
                     layout: 'lightHorizontalLines'
                 },
                 { text: '\n' },
-                
+
                 {
                     table: {
-                        widths: ['*', 100],
+                        widths: ['*', 120],
                         body: [
-                            ['Subtotal:', { text: '$' + subtotal.toFixed(2), alignment: 'right' }],
-                            [`Tax (${this.data.taxRate}%):`, { text: '$' + taxAmount.toFixed(2), alignment: 'right' }],
-                            ['Discount:', { text: '-$' + this.data.discount.toFixed(2), alignment: 'right' }],
+                            ['Subtotal:', { text: '$' + this.formatCurrency(subtotal), alignment: 'right' }],
+                            [`Tax (${this.data.taxRate}%):`, { text: '$' + this.formatCurrency(taxAmount), alignment: 'right' }],
+                            ['Discount:', { text: '-$' + this.formatCurrency(this.data.discount), alignment: 'right' }],
                             [
-                                { text: 'TOTAL:', bold: true },
-                                { text: '$' + grandTotal.toFixed(2), bold: true, alignment: 'right', fontSize: 14 }
+                                { text: 'TOTAL:', bold: true, fontSize: 12 },
+                                { text: '$' + this.formatCurrency(grandTotal), bold: true, alignment: 'right', fontSize: 14 }
                             ]
                         ]
                     },
                     layout: 'noBorders'
                 },
-                
+
                 this.data.paymentTerms ? [
                     { text: '\nPAYMENT TERMS', style: 'sectionHeader' },
                     { text: this.data.paymentTerms, fontSize: 10 }
                 ] : [],
-                
+
                 this.data.scopeOfWork ? [
                     { text: '\nSCOPE OF WORK', style: 'sectionHeader' },
                     { text: this.data.scopeOfWork, fontSize: 10 }
                 ] : []
             ],
-            
+
             styles: {
                 title: {
                     fontSize: 24,
@@ -2208,12 +2559,12 @@ const app = {
                     fillColor: '#f0f0f0'
                 }
             },
-            
+
             defaultStyle: {
                 fontSize: 10
             }
         };
-        
+
         pdfMake.createPdf(docDefinition).download(`quote-${this.data.clientName || 'estimate'}.pdf`);
         this.showNotification('✓ PDF generated!');
     },
