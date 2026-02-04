@@ -371,6 +371,29 @@ app.post('/api/jobs', async (req, res) => {
     }
 });
 
+// Helper function to merge files (protects against accidental deletions)
+function mergeFiles(existingFiles, incomingFiles, deletedIds) {
+    const fileMap = new Map();
+
+    // Add existing files (unless explicitly deleted)
+    (existingFiles || []).forEach(file => {
+        const key = `${file.name}::${file.url}`;
+        if (!deletedIds.includes(key)) {
+            fileMap.set(key, file);
+        }
+    });
+
+    // Add incoming files (won't duplicate due to Map key)
+    (incomingFiles || []).forEach(file => {
+        const key = `${file.name}::${file.url}`;
+        if (!fileMap.has(key)) {
+            fileMap.set(key, file);
+        }
+    });
+
+    return Array.from(fileMap.values());
+}
+
 // Update job
 app.put('/api/jobs/:id', async (req, res) => {
     const client = await pool.connect();
@@ -379,8 +402,21 @@ app.put('/api/jobs/:id', async (req, res) => {
         console.log('Job ID:', req.params.id);
         console.log('Items count:', req.body.items?.length);
         console.log('Section scopes:', JSON.stringify(req.body.sectionScopes));
-        
+        console.log('Deleted file IDs:', req.body._deletedFileIds);
+
         await client.query('BEGIN');
+
+        // Fetch existing files to merge with incoming files
+        const existingJob = await client.query('SELECT files FROM jobs WHERE id = $1', [req.params.id]);
+        const existingFiles = existingJob.rows[0]?.files || [];
+
+        // Merge files: keep existing + add new, only delete if explicitly in _deletedFileIds
+        const deletedIds = req.body._deletedFileIds || [];
+        const mergedFiles = mergeFiles(existingFiles, req.body.files || [], deletedIds);
+
+        console.log('Existing files:', existingFiles.length);
+        console.log('Incoming files:', (req.body.files || []).length);
+        console.log('Merged files:', mergedFiles.length);
 
         await client.query(`
             UPDATE jobs SET
@@ -405,7 +441,7 @@ app.put('/api/jobs/:id', async (req, res) => {
             req.body.paymentTerms,
             req.body.scopeOfWork,
             req.body.disclaimers,
-            JSON.stringify(req.body.files || []),
+            JSON.stringify(mergedFiles),
             JSON.stringify(req.body.sectionScopes || {}),
             JSON.stringify(req.body.sectionDisclaimers || {}),
             JSON.stringify(req.body.contractorAssignments || {}),
@@ -426,7 +462,9 @@ app.put('/api/jobs/:id', async (req, res) => {
 
         await client.query('COMMIT');
         console.log('Job updated successfully');
-        res.json({ success: true });
+
+        // Return merged files so client can sync
+        res.json({ success: true, files: mergedFiles });
     } catch (err) {
         await client.query('ROLLBACK');
         console.error('Error updating job:', err);

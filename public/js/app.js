@@ -98,9 +98,71 @@ const app = {
         this.renderItems();
         this.renderFiles();
         this.calculateTotals();
-        
+
         // Load package templates for Add Package modal
         this.loadPackageTemplates();
+
+        // Initialize TabSync if we have a job ID
+        if (this.data.id && typeof TabSync !== 'undefined') {
+            TabSync.init(this.data.id);
+            this.setupTabSyncHandlers();
+        }
+    },
+
+    // Setup handlers for receiving sync messages from other tabs
+    setupTabSyncHandlers() {
+        if (typeof TabSync === 'undefined') return;
+
+        // Handle items updated from another tab
+        TabSync.on('ITEMS_UPDATED', (payload) => {
+            console.log('[App] Received ITEMS_UPDATED from another tab');
+            this.data.items = payload.items || this.data.items;
+            this.renderItems();
+            this.calculateTotals();
+            this.showNotification('Items updated from another tab', 2000);
+        });
+
+        // Handle files updated from another tab
+        TabSync.on('FILES_UPDATED', (payload) => {
+            console.log('[App] Received FILES_UPDATED from another tab');
+            // Merge files - adds new ones, respects deletions
+            this.data.files = TabSync.mergeFiles(
+                this.data.files,
+                payload.files,
+                payload.deletedFileIds
+            );
+            this.renderFiles();
+            this.showNotification('Files updated from another tab', 2000);
+        });
+
+        // Handle packages updated from another tab
+        TabSync.on('PACKAGES_UPDATED', (payload) => {
+            console.log('[App] Received PACKAGES_UPDATED from another tab');
+            this.data.items = payload.items || this.data.items;
+            this.data.sectionScopes = payload.sectionScopes || this.data.sectionScopes;
+            this.data.sectionDisclaimers = payload.sectionDisclaimers || this.data.sectionDisclaimers;
+            this.renderItems();
+            this.calculateTotals();
+            this.showNotification('Packages updated from another tab', 2000);
+        });
+
+        // Handle job saved from another tab
+        TabSync.on('JOB_SAVED', (payload) => {
+            console.log('[App] Received JOB_SAVED from another tab');
+            // Sync files from the authoritative save
+            if (payload.files) {
+                this.data.files = payload.files;
+                this.renderFiles();
+            }
+            if (payload.items) {
+                this.data.items = payload.items;
+                this.renderItems();
+                this.calculateTotals();
+            }
+            this.showNotification('Changes synced from another tab', 2000);
+        });
+
+        console.log('[App] TabSync handlers registered');
     },
     
     resetForNewJob() {
@@ -386,12 +448,21 @@ const app = {
         
         // Add items to job
         this.data.items.push(...selectedItems);
-        
+
         this.closeModal();
         this.renderItems();
         this.calculateTotals();
         this.save();
         this.showNotification(`✓ Added "${packageName}" with ${selectedItems.length} item${selectedItems.length > 1 ? 's' : ''}`);
+
+        // Broadcast package addition to other tabs
+        if (typeof TabSync !== 'undefined') {
+            TabSync.broadcast('PACKAGES_UPDATED', {
+                items: this.data.items,
+                sectionScopes: this.data.sectionScopes,
+                sectionDisclaimers: this.data.sectionDisclaimers
+            });
+        }
     },
 
     switchTab(tabName) {
@@ -534,16 +605,21 @@ const app = {
             url: url,
             addedAt: new Date().toISOString()
         });
-        
+
         console.log('File link added:', name);
         console.log('Total file links now:', this.data.files.length);
-        
+
         // Clear inputs
         nameInput.value = '';
         urlInput.value = '';
-        
+
         this.renderFiles();
         this.save();
+
+        // Broadcast file addition to other tabs
+        if (typeof TabSync !== 'undefined') {
+            TabSync.broadcast('FILES_UPDATED', { files: this.data.files });
+        }
     },
     
     renderFiles() {
@@ -597,9 +673,22 @@ const app = {
     },
     
     removeFile(index) {
+        // Track deleted files so server knows to remove them
+        const file = this.data.files[index];
+        if (file) {
+            const fileKey = `${file.name}::${file.url}`;
+            if (!this.data._deletedFileIds) this.data._deletedFileIds = [];
+            this.data._deletedFileIds.push(fileKey);
+        }
+
         this.data.files.splice(index, 1);
         this.renderFiles();
         this.save();
+
+        // Broadcast file removal to other tabs
+        if (typeof TabSync !== 'undefined') {
+            TabSync.broadcast('FILES_UPDATED', { files: this.data.files, deletedFileIds: this.data._deletedFileIds });
+        }
     },
 
     async removeItem(index) {
@@ -618,6 +707,11 @@ const app = {
         this.calculateTotals();
         this.save();
         await this.saveToDatabase(false);
+
+        // Broadcast item update to other tabs
+        if (typeof TabSync !== 'undefined') {
+            TabSync.broadcast('ITEMS_UPDATED', { items: this.data.items });
+        }
     },
 
     renderItems() {
@@ -1005,52 +1099,80 @@ const app = {
             console.log('Job ID:', this.data.id);
             console.log('Items being saved:', this.data.items.length);
             console.log('Section scopes being saved:', JSON.stringify(this.data.sectionScopes));
-            
+            console.log('Deleted file IDs:', this.data._deletedFileIds);
+
             const method = this.data.id ? 'PUT' : 'POST';
             const url = this.data.id ? `/api/jobs/${this.data.id}` : '/api/jobs';
-            
+
             console.log('API method:', method);
             console.log('API URL:', url);
-            
+
+            // Include _deletedFileIds in the request body
+            const payload = { ...this.data };
+
             const response = await fetch(url, {
                 method,
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(this.data)
+                body: JSON.stringify(payload)
             });
-            
+
             console.log('API response status:', response.status);
-            
+
             if (!response.ok) {
                 if (response.status === 413) {
                     throw new Error('Payload too large - files exceed server limit. Please use smaller files (max 2MB each) or fewer files.');
                 }
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
-            
+
             const result = await response.json();
             console.log('API response:', result);
-            
+
             if (!this.data.id && result.id) {
                 this.data.id = result.id;
                 // Update URL to include jobId
                 window.history.replaceState({}, '', `/?jobId=${result.id}`);
+
+                // Initialize TabSync now that we have a job ID
+                if (typeof TabSync !== 'undefined') {
+                    TabSync.init(result.id);
+                    this.setupTabSyncHandlers();
+                }
             }
-            
+
+            // Sync files from server response (server has authoritative merged files)
+            if (result.files) {
+                this.data.files = result.files;
+                this.renderFiles();
+                console.log('Files synced from server:', result.files.length);
+            }
+
+            // Clear deletion tracking after successful save
+            this.data._deletedFileIds = [];
+
+            // Broadcast save to other tabs
+            if (typeof TabSync !== 'undefined' && this.data.id) {
+                TabSync.broadcast('JOB_SAVED', {
+                    files: this.data.files,
+                    items: this.data.items
+                });
+            }
+
             if (showNotification) {
                 this.showNotification('✓ Saved to database!');
             }
-            
+
             return true;
         } catch (error) {
             console.error('Error saving to database:', error);
-            
+
             // Show user-friendly error message
             let errorMsg = '⚠️ Failed to save to database';
             if (error.message.includes('Payload too large')) {
                 errorMsg = '⚠️ Files too large! Please remove some files or use smaller ones.';
                 alert('Your files are too large to save.\n\nPlease:\n1. Remove large files and try again\n2. Use files under 2MB each\n3. Or use a file sharing service instead');
             }
-            
+
             if (showNotification) {
                 this.showNotification(errorMsg, 5000);
             }
@@ -1124,8 +1246,9 @@ const app = {
         if (saved) {
             try {
                 const loadedData = JSON.parse(saved);
-                // Merge loaded data but ensure files array exists (it's not in localStorage)
-                this.data = { ...loadedData, files: [] };
+                // Merge loaded data but preserve existing files array (localStorage doesn't store files)
+                // Use existing files from this.data if available, otherwise empty array
+                this.data = { ...this.data, ...loadedData, files: this.data.files || [] };
                 this.populateForm();
                 return true;
             } catch (e) {
@@ -1443,15 +1566,24 @@ const app = {
         if (confirm(`Are you sure you want to delete the entire "${category}" section? This will remove all items in this section.`)) {
             // Remove all items in this category
             this.data.items = this.data.items.filter(item => item.category !== category);
-            
+
             // Remove section-specific scope and disclaimers
             delete this.data.sectionScopes[category];
             delete this.data.sectionDisclaimers[category];
-            
+
             this.renderItems();
             this.calculateTotals();
             this.save();
             this.showNotification(`✓ "${category}" section deleted`);
+
+            // Broadcast package deletion to other tabs
+            if (typeof TabSync !== 'undefined') {
+                TabSync.broadcast('PACKAGES_UPDATED', {
+                    items: this.data.items,
+                    sectionScopes: this.data.sectionScopes,
+                    sectionDisclaimers: this.data.sectionDisclaimers
+                });
+            }
         }
     },
 
