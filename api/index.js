@@ -235,7 +235,8 @@ async function initDB() {
                 'Tank Monitor Package',
                 'Dispensers - Wayne Anthem',
                 'Dispensers - Gilbarco',
-                'Canopy Equipment'
+                'Canopy Equipment',
+                'POS - Passport'
             ];
             for (let i = 0; i < defaultPackages.length; i++) {
                 await client.query(
@@ -258,7 +259,8 @@ async function initDB() {
                 'Tank Monitor Package',
                 'Dispensers - Wayne Anthem',
                 'Dispensers - Gilbarco',
-                'Canopy Equipment'
+                'Canopy Equipment',
+                'POS - Passport'
             ];
             
             for (let i = 0; i < requiredPackages.length; i++) {
