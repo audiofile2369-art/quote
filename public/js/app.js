@@ -559,6 +559,69 @@ const app = {
             wrapper.appendChild(body);
             container.appendChild(wrapper);
         });
+
+        // Also render the general scope display
+        this.renderGeneralScopeDisplay();
+    },
+
+    renderGeneralScopeDisplay() {
+        const display = document.getElementById('generalScopeDisplay');
+        const editDiv = document.getElementById('generalScopeEdit');
+        const editBtn = document.getElementById('editGeneralScopeBtn');
+
+        if (!display) return;
+
+        const scopeText = this.data.scopeOfWork || '';
+
+        if (scopeText.trim()) {
+            display.textContent = scopeText;
+            display.style.color = '#333';
+        } else {
+            display.textContent = 'No general scope of work defined. Click Edit to add one.';
+            display.style.color = '#999';
+            display.style.fontStyle = 'italic';
+        }
+
+        // Ensure we're in display mode
+        display.style.display = 'block';
+        if (editDiv) editDiv.style.display = 'none';
+        if (editBtn) editBtn.style.display = 'inline-block';
+    },
+
+    editGeneralScope() {
+        const display = document.getElementById('generalScopeDisplay');
+        const editDiv = document.getElementById('generalScopeEdit');
+        const editBtn = document.getElementById('editGeneralScopeBtn');
+        const textarea = document.getElementById('scopeOfWork');
+
+        if (!editDiv || !textarea) return;
+
+        // Switch to edit mode
+        display.style.display = 'none';
+        editDiv.style.display = 'block';
+        if (editBtn) editBtn.style.display = 'none';
+
+        // Populate textarea with current value
+        textarea.value = this.data.scopeOfWork || '';
+        textarea.focus();
+    },
+
+    async saveGeneralScope() {
+        const textarea = document.getElementById('scopeOfWork');
+        if (!textarea) return;
+
+        this.data.scopeOfWork = textarea.value;
+        this.save();
+        await this.saveToDatabase(true);
+
+        // Switch back to display mode
+        this.renderGeneralScopeDisplay();
+        this.showNotification('✓ General scope of work saved!');
+    },
+
+    cancelGeneralScopeEdit() {
+        // Just switch back to display mode without saving
+        this.renderGeneralScopeDisplay();
     },
 
     addItem() {
