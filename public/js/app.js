@@ -496,17 +496,20 @@ const app = {
     },
 
     renderSectionScopes() {
+        // Always render the general scope display first
+        this.renderGeneralScopeDisplay();
+
         const container = document.getElementById('sectionScopesDisplay');
         if (!container) return;
-        
+
         const allScopes = this.data.sectionScopes || {};
         let sections = Object.keys(allScopes);
-        
+
         // In contractor mode, only show their assigned sections
         if (this.data.mode === 'contractor' && this.data.contractorSections && this.data.contractorSections.length) {
             sections = sections.filter(s => this.data.contractorSections.includes(s));
         }
-        
+
         if (sections.length === 0) {
             container.innerHTML = '<p style="color:#666">No section scopes yet.</p>';
             return;
@@ -559,9 +562,6 @@ const app = {
             wrapper.appendChild(body);
             container.appendChild(wrapper);
         });
-
-        // Also render the general scope display
-        this.renderGeneralScopeDisplay();
     },
 
     renderGeneralScopeDisplay() {
