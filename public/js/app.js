@@ -21,6 +21,7 @@ const app = {
         sectionScopes: {}, // { 'package': 'scope text' }
         sectionDisclaimers: {}, // { 'package': 'disclaimer text' }
         contractorSectionDisclaimers: {}, // { 'package': { 'contractorName': 'disclaimer text' } }
+        sectionUpcharges: {}, // { 'package': 15 } - percentage upcharge for cost -> price calculation
         contractorAssignments: {}, // { 'contractorName': ['Package A', 'Package B'] }
         mode: 'owner', // 'owner' or 'contractor'
         contractorName: null, // contractor viewing this
@@ -195,6 +196,7 @@ const app = {
             sectionScopes: {},
             sectionDisclaimers: {},
             contractorSectionDisclaimers: {},
+            sectionUpcharges: {},
             contractorAssignments: {},
             mode: 'owner',
             contractorName: null,
@@ -969,6 +971,54 @@ const app = {
         }
     },
 
+    // Update cost and auto-calculate price based on upcharge percentage
+    async updateItemCost(index, category, cost) {
+        cost = parseFloat(cost) || 0;
+        const upchargePercent = this.data.sectionUpcharges?.[category] || 0;
+        const price = cost * (1 + upchargePercent / 100);
+
+        this.data.items[index].cost = cost;
+        this.data.items[index].price = Math.round(price * 100) / 100; // Round to 2 decimals
+
+        this.calculateTotals();
+        this.save();
+        await this.saveToDatabase(false);
+
+        // Re-render to show updated price
+        this.renderItems();
+
+        // Broadcast item update to other tabs
+        if (typeof TabSync !== 'undefined') {
+            TabSync.broadcast('ITEMS_UPDATED', { items: this.data.items });
+        }
+    },
+
+    // Update upcharge percentage for a category and recalculate all prices
+    async updateSectionUpcharge(category, percent) {
+        percent = parseFloat(percent) || 0;
+
+        if (!this.data.sectionUpcharges) {
+            this.data.sectionUpcharges = {};
+        }
+        this.data.sectionUpcharges[category] = percent;
+
+        // Recalculate prices for all items in this category that have a cost
+        this.data.items.forEach(item => {
+            if (item.category === category && item.cost) {
+                item.price = Math.round(item.cost * (1 + percent / 100) * 100) / 100;
+            }
+        });
+
+        this.calculateTotals();
+        this.save();
+        await this.saveToDatabase(false);
+
+        // Re-render to show updated prices
+        this.renderItems();
+
+        this.showNotification(`✓ Markup updated to ${percent}% for ${category}`);
+    },
+
     renderItems() {
         const container = document.getElementById('categorySections');
         if (!container) return;
@@ -1044,13 +1094,21 @@ const app = {
                 disclaimerButtons = `<button class="btn-header" onclick="app.editSectionDisclaimers('${category}')">⚠️ Disclaimers</button>`;
             }
 
+            // Find contractor assigned to this category
+            const assignedContractor = this.getContractorForCategory(category);
+
             header.innerHTML = `
-                <div style="display: flex; align-items: center; gap: 10px;">
+                <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
                     ${this.data.mode !== 'contractor' ? `<input type="checkbox" class="section-checkbox" data-category="${category}" style="width: 18px; height: 18px; cursor: pointer;">` : ''}
                     <span>${category}</span>
+                    ${this.data.mode !== 'contractor' ? `
+                        <div id="contractor-display-${category.replace(/[^a-zA-Z0-9]/g, '_')}" style="display: flex; align-items: center; gap: 5px; margin-left: 10px; padding: 4px 10px; background: ${assignedContractor ? '#e0f2fe' : '#f3f4f6'}; border-radius: 4px; font-size: 13px;">
+                            <span style="color: ${assignedContractor ? '#0369a1' : '#6b7280'};">${assignedContractor ? `👷 ${assignedContractor}` : 'No contractor assigned'}</span>
+                            <button onclick="app.editContractorAssignment('${category}')" style="background: none; border: none; cursor: pointer; padding: 2px; font-size: 14px;" title="Edit contractor">✏️</button>
+                        </div>
+                    ` : ''}
                 </div>
                 <div class="category-header-buttons">
-                    ${this.data.mode !== 'contractor' ? `<button class="btn-header" onclick="app.sendSectionToContractor('${category}')">📤 Send to Contractor</button>` : ''}
                     <button class="btn-header" onclick="app.editSectionScope('${category}')">📋 Scope of Work</button>
                     ${disclaimerButtons}
                     ${this.data.mode !== 'contractor' ? `<button class="btn-header btn-delete-section" onclick="app.deleteSection('${category}')">🗑️ Delete Package</button>` : ''}
@@ -1058,44 +1116,72 @@ const app = {
             `;
             section.appendChild(header);
             
+            // Upcharge dropdown (owner mode only)
+            const upchargePercent = this.data.sectionUpcharges?.[category] || 0;
+            if (this.data.mode !== 'contractor') {
+                const upchargeBar = document.createElement('div');
+                upchargeBar.style.cssText = 'display: flex; align-items: center; gap: 10px; padding: 8px 15px; background: #fff3cd; border: 1px solid #ffc107; border-radius: 6px 6px 0 0; font-size: 14px;';
+                upchargeBar.innerHTML = `
+                    <span style="font-weight: 600; color: #856404;">📊 Markup:</span>
+                    <select onchange="app.updateSectionUpcharge('${category}', this.value)" style="padding: 5px 10px; border: 1px solid #ffc107; border-radius: 4px; background: white; font-size: 14px;">
+                        <option value="0" ${upchargePercent === 0 ? 'selected' : ''}>0% (No markup)</option>
+                        <option value="5" ${upchargePercent === 5 ? 'selected' : ''}>5%</option>
+                        <option value="10" ${upchargePercent === 10 ? 'selected' : ''}>10%</option>
+                        <option value="15" ${upchargePercent === 15 ? 'selected' : ''}>15%</option>
+                        <option value="20" ${upchargePercent === 20 ? 'selected' : ''}>20%</option>
+                        <option value="25" ${upchargePercent === 25 ? 'selected' : ''}>25%</option>
+                        <option value="30" ${upchargePercent === 30 ? 'selected' : ''}>30%</option>
+                        <option value="35" ${upchargePercent === 35 ? 'selected' : ''}>35%</option>
+                        <option value="40" ${upchargePercent === 40 ? 'selected' : ''}>40%</option>
+                        <option value="50" ${upchargePercent === 50 ? 'selected' : ''}>50%</option>
+                    </select>
+                    <span style="color: #856404; font-size: 13px;">Cost × ${(1 + upchargePercent/100).toFixed(2)} = Unit Price</span>
+                `;
+                section.appendChild(upchargeBar);
+            }
+
             const tableContainer = document.createElement('div');
             tableContainer.className = 'category-table';
-            
+
             const table = document.createElement('table');
             table.innerHTML = `
                 <thead>
                     <tr>
-                        <th style="width: 40%;">Description</th>
-                        <th style="width: 100px;">QTY</th>
-                        <th style="width: 120px;">Unit Price</th>
-                        <th style="width: 120px;">Total</th>
-                        <th style="width: 60px;"></th>
+                        <th style="width: 35%;">Description</th>
+                        <th style="width: 80px;">QTY</th>
+                        <th style="width: 100px;">Cost</th>
+                        <th style="width: 100px;">Unit Price</th>
+                        <th style="width: 100px;">Total</th>
+                        <th style="width: 50px;"></th>
                     </tr>
                 </thead>
                 <tbody></tbody>
             `;
-            
+
             const tbody = table.querySelector('tbody');
-            
+
             categories[category].forEach(({ item, index }) => {
                 const row = document.createElement('tr');
-                const total = (item.qty || 0) * (item.price || 0);
+                const cost = item.cost || 0;
+                const price = item.price || 0;
+                const total = (item.qty || 0) * price;
                 const escapedDesc = (item.description || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-                
+
                 // In contractor mode, allow full editing within assigned sections; lock others
                 const isContractorSection = this.data.mode === 'contractor' && this.data.contractorSections.includes(category);
                 const readOnlyStyle = 'readonly style="background: #e9ecef; cursor: not-allowed;"';
                 const descReadonly = (this.data.mode === 'contractor' && !isContractorSection) ? readOnlyStyle : '';
                 const qtyReadonly = (this.data.mode === 'contractor' && !isContractorSection) ? readOnlyStyle : '';
+                const costReadonly = (this.data.mode === 'contractor' && !isContractorSection) ? readOnlyStyle : '';
                 const removeBtn = (this.data.mode !== 'contractor' || isContractorSection) ? `<button class="btn-remove" onclick="app.removeItem(${index})">×</button>` : '';
-                
+
                 // Add autocomplete container for description input
                 const descInputId = `desc-input-${index}`;
-                
+
                 row.innerHTML = `
                     <td style="position: relative;">
-                        <input type="text" id="${descInputId}" value="${escapedDesc}" 
-                            onchange="app.updateItem(${index}, 'description', this.value)" 
+                        <input type="text" id="${descInputId}" value="${escapedDesc}"
+                            onchange="app.updateItem(${index}, 'description', this.value)"
                             oninput="app.showAutocomplete(this, ${index})"
                             onfocus="app.showAutocomplete(this, ${index})"
                             onblur="setTimeout(() => app.hideAutocomplete(${index}), 200)"
@@ -1104,7 +1190,8 @@ const app = {
                         <div id="autocomplete-${index}" class="autocomplete-dropdown" style="display: none;"></div>
                     </td>
                     <td><input type="number" value="${item.qty || 0}" step="1" min="0" onchange="app.updateItem(${index}, 'qty', this.value)" ${qtyReadonly}></td>
-                    <td><input type="number" value="${item.price || 0}" step="0.01" min="0" onchange="app.updateItem(${index}, 'price', this.value)"></td>
+                    <td><input type="number" value="${cost}" step="0.01" min="0" onchange="app.updateItemCost(${index}, '${category}', this.value)" ${costReadonly} style="background: #fffbeb;"></td>
+                    <td><input type="number" value="${price}" step="0.01" min="0" onchange="app.updateItem(${index}, 'price', this.value)"></td>
                     <td><input type="text" value="$${total.toFixed(2)}" readonly></td>
                     <td>${removeBtn}</td>
                 `;
@@ -1114,14 +1201,29 @@ const app = {
             tableContainer.appendChild(table);
             section.appendChild(tableContainer);
             
-            // Calculate and display section total
+            // Calculate and display section totals
+            const sectionCostTotal = categories[category].reduce((sum, { item }) => {
+                return sum + ((item.qty || 0) * (item.cost || 0));
+            }, 0);
             const sectionTotal = categories[category].reduce((sum, { item }) => {
                 return sum + ((item.qty || 0) * (item.price || 0));
             }, 0);
-            
+            const sectionProfit = sectionTotal - sectionCostTotal;
+
             const sectionTotalDiv = document.createElement('div');
-            sectionTotalDiv.style.cssText = 'background: #f8f9fa; padding: 12px 20px; border-radius: 0 0 6px 6px; text-align: right; font-weight: 600; font-size: 16px; color: #495057; border: 1px solid #dee2e6; border-top: none;';
-            sectionTotalDiv.innerHTML = `Section Total: <span style="color: #f97316; font-size: 18px;">$${sectionTotal.toFixed(2)}</span>`;
+            sectionTotalDiv.style.cssText = 'background: #f8f9fa; padding: 12px 20px; border-radius: 0 0 6px 6px; font-weight: 600; font-size: 14px; color: #495057; border: 1px solid #dee2e6; border-top: none; display: flex; justify-content: space-between; align-items: center;';
+
+            if (this.data.mode !== 'contractor' && sectionCostTotal > 0) {
+                sectionTotalDiv.innerHTML = `
+                    <div style="display: flex; gap: 20px;">
+                        <span>Cost: <span style="color: #6b7280;">$${sectionCostTotal.toFixed(2)}</span></span>
+                        <span>Profit: <span style="color: #22c55e;">$${sectionProfit.toFixed(2)}</span></span>
+                    </div>
+                    <div>Section Total: <span style="color: #f97316; font-size: 18px;">$${sectionTotal.toFixed(2)}</span></div>
+                `;
+            } else {
+                sectionTotalDiv.innerHTML = `<div style="text-align: right; width: 100%;">Section Total: <span style="color: #f97316; font-size: 18px;">$${sectionTotal.toFixed(2)}</span></div>`;
+            }
             section.appendChild(sectionTotalDiv);
             
             // Add button for this category (only in owner mode or contractor's own sections)
@@ -1493,6 +1595,7 @@ const app = {
             this.data.sectionScopes = job.section_scopes || {};
             this.data.sectionDisclaimers = job.section_disclaimers || {};
             this.data.contractorSectionDisclaimers = job.contractor_section_disclaimers || {};
+            this.data.sectionUpcharges = job.section_upcharges || {};
             this.data.contractorAssignments = job.contractor_assignments || {};
             this.data.items = job.items || [];
             
@@ -1690,19 +1793,67 @@ const app = {
         }
     },
     
+    // Get contractor assigned to a specific category
+    getContractorForCategory(category) {
+        const assignments = this.data.contractorAssignments || {};
+        for (const [contractorName, categories] of Object.entries(assignments)) {
+            if (categories && categories.includes(category)) {
+                return contractorName;
+            }
+        }
+        return null;
+    },
+
+    // Edit contractor assignment for a category
+    async editContractorAssignment(category) {
+        const currentContractor = this.getContractorForCategory(category);
+        const newName = prompt(
+            `Enter contractor name for "${category}":`,
+            currentContractor || ''
+        );
+
+        if (newName === null) return; // Cancelled
+
+        const cleanName = newName.trim();
+
+        // Remove this category from any existing contractor assignment
+        for (const [contractor, categories] of Object.entries(this.data.contractorAssignments || {})) {
+            if (categories && categories.includes(category)) {
+                this.data.contractorAssignments[contractor] = categories.filter(c => c !== category);
+                // Clean up empty assignments
+                if (this.data.contractorAssignments[contractor].length === 0) {
+                    delete this.data.contractorAssignments[contractor];
+                }
+            }
+        }
+
+        // Assign to new contractor (if name provided)
+        if (cleanName) {
+            if (!this.data.contractorAssignments[cleanName]) {
+                this.data.contractorAssignments[cleanName] = [];
+            }
+            this.data.contractorAssignments[cleanName].push(category);
+        }
+
+        this.save();
+        await this.saveToDatabase(false);
+        this.renderItems();
+        this.showNotification(cleanName ? `✓ ${category} assigned to ${cleanName}` : `✓ Contractor removed from ${category}`);
+    },
+
     async sendSectionToContractor(category) {
         const contractorName = prompt(`Enter contractor name for ${category}:`);
         if (!contractorName || !contractorName.trim()) return;
         const cleanName = contractorName.trim();
-        
+
         // Assign this single section and persist to DB to ensure job ID exists in data
         this.data.contractorAssignments[cleanName] = Array.from(new Set([...(this.data.contractorAssignments[cleanName] || []), category]));
         this.save();
         await this.saveToDatabase(true);
-        
+
         const encoded = btoa(JSON.stringify(this.data));
         const url = `${window.location.origin}${window.location.pathname}?data=${encoded}&mode=contractor&contractor=${encodeURIComponent(cleanName)}`;
-        
+
         navigator.clipboard.writeText(url).then(() => {
             this.showNotification(`✓ Link for "${category}" copied for ${cleanName}!`, 5000);
         }).catch(() => {
