@@ -624,6 +624,148 @@ const app = {
         this.renderGeneralScopeDisplay();
     },
 
+    // ============ SECTION DISCLAIMERS ============
+
+    renderSectionDisclaimers() {
+        // Always render the general disclaimers display first
+        this.renderGeneralDisclaimersDisplay();
+
+        const container = document.getElementById('sectionDisclaimersDisplay');
+        if (!container) return;
+
+        const allDisclaimers = this.data.sectionDisclaimers || {};
+        let sections = Object.keys(allDisclaimers);
+
+        // In contractor mode, only show their assigned sections
+        if (this.data.mode === 'contractor' && this.data.contractorSections && this.data.contractorSections.length) {
+            sections = sections.filter(s => this.data.contractorSections.includes(s));
+        }
+
+        if (sections.length === 0) {
+            container.innerHTML = '<p style="color:#666">No equipment package disclaimers yet. Add disclaimers from the Equipment Packages tab.</p>';
+            return;
+        }
+
+        // Helper to find contractor(s) assigned to a category
+        const getContractorsForCategory = (category) => {
+            const result = [];
+            const assignments = this.data.contractorAssignments || {};
+            Object.keys(assignments).forEach(name => {
+                if ((assignments[name] || []).includes(category)) {
+                    result.push(name);
+                }
+            });
+            return result;
+        };
+
+        // Build sections styled like Line Items headers
+        container.innerHTML = '';
+        sections.forEach(sectionName => {
+            const disclaimerText = allDisclaimers[sectionName];
+            if (!disclaimerText || !disclaimerText.trim()) return;
+
+            const contractors = getContractorsForCategory(sectionName);
+            const contractorLabel = contractors.length
+                ? ` — ${contractors.join(', ')}`
+                : (this.data.mode === 'contractor' && this.data.contractorName ? ` — ${this.data.contractorName}` : '');
+
+            const wrapper = document.createElement('div');
+            wrapper.className = 'category-section';
+
+            const header = document.createElement('div');
+            header.className = 'category-header';
+            const showDeleteBtn = this.data.mode !== 'contractor';
+            header.innerHTML = `
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <span>${sectionName}${contractorLabel}</span>
+                </div>
+                <div class="category-header-buttons">
+                    <button class="btn-header" onclick="app.editSectionDisclaimers('${sectionName}')">✏️ Edit</button>
+                    ${showDeleteBtn ? `<button class="btn-header btn-delete-section" onclick="app.deleteSectionDisclaimer('${sectionName}')">🗑️ Delete</button>` : ''}
+                </div>
+            `;
+
+            const body = document.createElement('div');
+            body.style.cssText = 'border:1px solid #dee2e6; border-top:none; border-radius:0 0 6px 6px; background:#fff; padding:15px;';
+            body.innerHTML = `<div style="white-space:pre-wrap; color:#333; line-height:1.6;">${disclaimerText}</div>`;
+
+            wrapper.appendChild(header);
+            wrapper.appendChild(body);
+            container.appendChild(wrapper);
+        });
+    },
+
+    renderGeneralDisclaimersDisplay() {
+        const display = document.getElementById('generalDisclaimersDisplay');
+        const editDiv = document.getElementById('generalDisclaimersEdit');
+        const editBtn = document.getElementById('editGeneralDisclaimersBtn');
+
+        if (!display) return;
+
+        const disclaimerText = this.data.disclaimers || '';
+
+        if (disclaimerText.trim()) {
+            display.textContent = disclaimerText;
+            display.style.color = '#333';
+            display.style.fontStyle = 'normal';
+        } else {
+            display.textContent = 'No general disclaimers defined. Click Edit to add one.';
+            display.style.color = '#999';
+            display.style.fontStyle = 'italic';
+        }
+
+        // Ensure we're in display mode
+        display.style.display = 'block';
+        if (editDiv) editDiv.style.display = 'none';
+        if (editBtn) editBtn.style.display = 'inline-block';
+    },
+
+    editGeneralDisclaimers() {
+        const display = document.getElementById('generalDisclaimersDisplay');
+        const editDiv = document.getElementById('generalDisclaimersEdit');
+        const editBtn = document.getElementById('editGeneralDisclaimersBtn');
+        const textarea = document.getElementById('disclaimers');
+
+        if (!editDiv || !textarea) return;
+
+        // Switch to edit mode
+        display.style.display = 'none';
+        editDiv.style.display = 'block';
+        if (editBtn) editBtn.style.display = 'none';
+
+        // Populate textarea with current value
+        textarea.value = this.data.disclaimers || '';
+        textarea.focus();
+    },
+
+    async saveGeneralDisclaimers() {
+        const textarea = document.getElementById('disclaimers');
+        if (!textarea) return;
+
+        this.data.disclaimers = textarea.value;
+        this.save();
+        await this.saveToDatabase(true);
+
+        // Switch back to display mode
+        this.renderGeneralDisclaimersDisplay();
+        this.showNotification('✓ General disclaimers saved!');
+    },
+
+    cancelGeneralDisclaimersEdit() {
+        // Just switch back to display mode without saving
+        this.renderGeneralDisclaimersDisplay();
+    },
+
+    async deleteSectionDisclaimer(category) {
+        if (!confirm(`Delete disclaimers for "${category}"?`)) return;
+
+        delete this.data.sectionDisclaimers[category];
+        this.save();
+        await this.saveToDatabase(true);
+        this.renderSectionDisclaimers();
+        this.showNotification(`✓ Disclaimers deleted for "${category}"`);
+    },
+
     addItem() {
         // Get the last item's category, or default to first category
         const lastCategory = this.data.items.length > 0 ? 
