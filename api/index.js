@@ -852,13 +852,10 @@ app.post('/api/package-templates/save-defaults', async (req, res) => {
     try {
         const { packageName, lineItems } = req.body;
         
-        // Strip letter prefix (e.g., "A. ", "B. ") from package name if present
-        const cleanPackageName = packageName.replace(/^[A-Z]\.\s+/, '');
-        
         // Get package template ID
-        const pkgResult = await pool.query('SELECT id FROM package_templates WHERE name = $1', [cleanPackageName]);
+        const pkgResult = await pool.query('SELECT id FROM package_templates WHERE name = $1', [packageName]);
         if (pkgResult.rows.length === 0) {
-            console.log(`Package template not found for: '${cleanPackageName}' (original: '${packageName}')`);
+            console.log(`Package template not found for: '${packageName}'`);
             return res.status(404).json({ error: 'Package template not found' });
         }
         const packageTemplateId = pkgResult.rows[0].id;
@@ -879,7 +876,7 @@ app.post('/api/package-templates/save-defaults', async (req, res) => {
             }
             
             await client.query('COMMIT');
-            res.json({ success: true, message: `Saved ${lineItems.length} line items as default for ${cleanPackageName}` });
+            res.json({ success: true, message: `Saved ${lineItems.length} line items as default for ${packageName}` });
         } catch (err) {
             await client.query('ROLLBACK');
             throw err;
@@ -897,11 +894,8 @@ app.post('/api/package-templates/check-defaults', async (req, res) => {
     try {
         const { packageName, lineItems } = req.body;
         
-        // Strip letter prefix (e.g., "A. ", "B. ") from package name if present
-        const cleanPackageName = packageName.replace(/^[A-Z]\.\s+/, '');
-        
         // Get package template ID
-        const pkgResult = await pool.query('SELECT id FROM package_templates WHERE name = $1', [cleanPackageName]);
+        const pkgResult = await pool.query('SELECT id FROM package_templates WHERE name = $1', [packageName]);
         if (pkgResult.rows.length === 0) {
             return res.json({ matches: false });
         }
