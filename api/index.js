@@ -852,9 +852,13 @@ app.post('/api/package-templates/save-defaults', async (req, res) => {
     try {
         const { packageName, lineItems } = req.body;
         
+        // Strip letter prefix (e.g., "A. ", "B. ") from package name if present
+        const cleanPackageName = packageName.replace(/^[A-Z]\.\s+/, '');
+        
         // Get package template ID
-        const pkgResult = await pool.query('SELECT id FROM package_templates WHERE name = $1', [packageName]);
+        const pkgResult = await pool.query('SELECT id FROM package_templates WHERE name = $1', [cleanPackageName]);
         if (pkgResult.rows.length === 0) {
+            console.log(`Package template not found for: '${cleanPackageName}' (original: '${packageName}')`);
             return res.status(404).json({ error: 'Package template not found' });
         }
         const packageTemplateId = pkgResult.rows[0].id;
@@ -875,7 +879,7 @@ app.post('/api/package-templates/save-defaults', async (req, res) => {
             }
             
             await client.query('COMMIT');
-            res.json({ success: true, message: `Saved ${lineItems.length} line items as default for ${packageName}` });
+            res.json({ success: true, message: `Saved ${lineItems.length} line items as default for ${cleanPackageName}` });
         } catch (err) {
             await client.query('ROLLBACK');
             throw err;
@@ -893,8 +897,11 @@ app.post('/api/package-templates/check-defaults', async (req, res) => {
     try {
         const { packageName, lineItems } = req.body;
         
+        // Strip letter prefix (e.g., "A. ", "B. ") from package name if present
+        const cleanPackageName = packageName.replace(/^[A-Z]\.\s+/, '');
+        
         // Get package template ID
-        const pkgResult = await pool.query('SELECT id FROM package_templates WHERE name = $1', [packageName]);
+        const pkgResult = await pool.query('SELECT id FROM package_templates WHERE name = $1', [cleanPackageName]);
         if (pkgResult.rows.length === 0) {
             return res.json({ matches: false });
         }
