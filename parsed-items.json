@@ -1,0 +1,116 @@
+{
+  "Forecourt Island Equipment": [
+    {
+      "partNum": "A0060-023",
+      "desc": "Shear Valve 1 1/2\", Two Poppet Female",
+      "cost": 177.45,
+      "qty": 8.0
+    }
+  ],
+  "Forecourt Submerged Pump Package": [
+    {
+      "partNum": "A0716-042",
+      "desc": "MH Round, 42\" x 10\", Lay-In, Composite Lid",
+      "cost": 1276.07,
+      "qty": 8.0
+    },
+    {
+      "partNum": "A0750-200",
+      "desc": "Ball Valve Full Port 2\"",
+      "cost": 125.08,
+      "qty": 3.0
+    }
+  ],
+  "Tank Equipment": [
+    {
+      "partNum": "A1004EVR-317S",
+      "desc": "5 Gallon Double Wall Spill Container, EVR, Replaceable, Poly Primary/Poly Secondary, No Drain, Powdercoated Cast Iron Rim & Lid, Cast NPT Base, Riser Lock, EZ Gage, [Generic/Black]",
+      "cost": 1416.8,
+      "qty": 3.0
+    },
+    {
+      "partNum": "A1100EVR-056M",
+      "desc": "OPV[EVR] 17', Dual Point, Vapor Tight, Modular, Shipping Dims: 5\"x18\"x65\"",
+      "cost": 1214.19,
+      "qty": 3.0
+    },
+    {
+      "partNum": "A0030-124S",
+      "desc": "Fill Adapter, EVR, Brass, 4\"X4\" NPSM Swivel",
+      "cost": 345.55,
+      "qty": 2.0
+    },
+    {
+      "partNum": "A0030-024",
+      "desc": "Fill Adapter, Brass, Lugs, 4\" NPSM x 4\" CAM",
+      "cost": 105.07,
+      "qty": 1.0
+    },
+    {
+      "partNum": "A0097-005",
+      "desc": "Tight Fill Cap 4\"",
+      "cost": 60.38,
+      "qty": 3.0
+    },
+    {
+      "partNum": "A1004EVR-317A",
+      "desc": "5 Gallon Single Wall Spill Container, EVR, Replaceable, Poly Primary, No Drain, Powdercoated Cast Iron Rim & Lid, Cast NPT Base, Riser Lock, [Generic/Black]",
+      "cost": 860.74,
+      "qty": 1.0
+    },
+    {
+      "partNum": "A0076-124S",
+      "desc": "Vapor Adapter, EVR, Brass, 4\" Cam x 4\" Swivel",
+      "cost": 462.3,
+      "qty": 1.0
+    },
+    {
+      "partNum": "A0099-002",
+      "desc": "Vapor Cap 4\"",
+      "cost": 65.71,
+      "qty": 1.0
+    },
+    {
+      "partNum": "A0079-051",
+      "desc": "Extractor Fitting 4\"X4\"X3\"X2\"",
+      "cost": 205.46,
+      "qty": 3.0
+    },
+    {
+      "partNum": "494096",
+      "desc": "Riser Seal, Stainless Steel, Carb EVR Phase I",
+      "cost": 218.97,
+      "qty": 2.0
+    },
+    {
+      "partNum": "N/A",
+      "desc": "2\" EVR Vent Cap",
+      "cost": 0.0,
+      "qty": 2.0
+    },
+    {
+      "partNum": "A0785-001",
+      "desc": "Vent Downward, Aluminum, 1.5\" & 2\" Female, NPT",
+      "cost": 31.73,
+      "qty": 1.0
+    },
+    {
+      "partNum": "A0717-122",
+      "desc": "MH Round, 12\" x 10\", Lay-In, Cast Iron Lid, Steel Skirt",
+      "cost": 156.84,
+      "qty": 3.0
+    },
+    {
+      "partNum": "A0716-018",
+      "desc": "Interstitial Manhole",
+      "cost": 338.56,
+      "qty": 1.0
+    },
+    {
+      "partNum": "A0721-001",
+      "desc": "MH Monitor Well, 12\"X12\", BD, White Ductile Lid, Poly Skirt",
+      "cost": 144.78,
+      "qty": 2.0
+    }
+  ]
+}
