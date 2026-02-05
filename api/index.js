@@ -216,11 +216,22 @@ async function initDB() {
                 package_template_id INTEGER REFERENCES package_templates(id) ON DELETE SET NULL,
                 description TEXT NOT NULL,
                 default_qty DECIMAL(10,2) DEFAULT 1,
+                default_cost DECIMAL(10,2) DEFAULT 0,
                 default_price DECIMAL(10,2) DEFAULT 0,
                 is_default_for_package BOOLEAN DEFAULT false,
                 created_at TIMESTAMP DEFAULT NOW(),
                 updated_at TIMESTAMP DEFAULT NOW()
             )
+        `);
+        
+        // Add default_cost column if it doesn't exist (for existing tables)
+        await client.query(`
+            DO $$
+            BEGIN
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='line_item_templates' AND column_name='default_cost') THEN
+                    ALTER TABLE line_item_templates ADD COLUMN default_cost DECIMAL(10,2) DEFAULT 0;
+                END IF;
+            END $$;
         `);
         
         // Seed default package templates if empty
@@ -782,11 +793,11 @@ app.get('/api/line-item-templates/search', async (req, res) => {
 // Create line item template
 app.post('/api/line-item-templates', async (req, res) => {
     try {
-        const { package_template_id, description, default_qty, default_price, is_default_for_package } = req.body;
+        const { package_template_id, description, default_qty, default_cost, default_price, is_default_for_package } = req.body;
         const result = await pool.query(`
-            INSERT INTO line_item_templates (package_template_id, description, default_qty, default_price, is_default_for_package)
-            VALUES ($1, $2, $3, $4, $5) RETURNING *
-        `, [package_template_id, description, default_qty || 1, default_price || 0, is_default_for_package || false]);
+            INSERT INTO line_item_templates (package_template_id, description, default_qty, default_cost, default_price, is_default_for_package)
+            VALUES ($1, $2, $3, $4, $5, $6) RETURNING *
+        `, [package_template_id, description, default_qty || 1, default_cost || 0, default_price || 0, is_default_for_package || false]);
         res.json(result.rows[0]);
     } catch (err) {
         console.error('Error creating line item template:', err);
@@ -797,12 +808,12 @@ app.post('/api/line-item-templates', async (req, res) => {
 // Update line item template
 app.put('/api/line-item-templates/:id', async (req, res) => {
     try {
-        const { package_template_id, description, default_qty, default_price, is_default_for_package } = req.body;
+        const { package_template_id, description, default_qty, default_cost, default_price, is_default_for_package } = req.body;
         const result = await pool.query(`
             UPDATE line_item_templates 
-            SET package_template_id = $1, description = $2, default_qty = $3, default_price = $4, is_default_for_package = $5, updated_at = NOW()
-            WHERE id = $6 RETURNING *
-        `, [package_template_id, description, default_qty, default_price, is_default_for_package, req.params.id]);
+            SET package_template_id = $1, description = $2, default_qty = $3, default_cost = $4, default_price = $5, is_default_for_package = $6, updated_at = NOW()
+            WHERE id = $7 RETURNING *
+        `, [package_template_id, description, default_qty, default_cost, default_price, is_default_for_package, req.params.id]);
         res.json(result.rows[0]);
     } catch (err) {
         console.error('Error updating line item template:', err);
@@ -833,6 +844,94 @@ app.get('/api/package-templates/:id/line-items', async (req, res) => {
     } catch (err) {
         console.error('Error fetching package line items:', err);
         res.status(500).json({ error: 'Failed to fetch package line items' });
+    }
+});
+
+// Save current job items as default for package template
+app.post('/api/package-templates/save-defaults', async (req, res) => {
+    try {
+        const { packageName, lineItems } = req.body;
+        
+        // Get package template ID
+        const pkgResult = await pool.query('SELECT id FROM package_templates WHERE name = $1', [packageName]);
+        if (pkgResult.rows.length === 0) {
+            return res.status(404).json({ error: 'Package template not found' });
+        }
+        const packageTemplateId = pkgResult.rows[0].id;
+        
+        const client = await pool.connect();
+        try {
+            await client.query('BEGIN');
+            
+            // Delete existing default line items for this package
+            await client.query('DELETE FROM line_item_templates WHERE package_template_id = $1', [packageTemplateId]);
+            
+            // Insert new defaults
+            for (const item of lineItems) {
+                await client.query(`
+                    INSERT INTO line_item_templates (package_template_id, description, default_qty, default_cost, default_price, is_default_for_package)
+                    VALUES ($1, $2, $3, $4, $5, true)
+                `, [packageTemplateId, item.description, item.qty, item.cost, item.price]);
+            }
+            
+            await client.query('COMMIT');
+            res.json({ success: true, message: `Saved ${lineItems.length} line items as default for ${packageName}` });
+        } catch (err) {
+            await client.query('ROLLBACK');
+            throw err;
+        } finally {
+            client.release();
+        }
+    } catch (err) {
+        console.error('Error saving package defaults:', err);
+        res.status(500).json({ error: 'Failed to save package defaults' });
+    }
+});
+
+// Check if current job items match defaults for package
+app.post('/api/package-templates/check-defaults', async (req, res) => {
+    try {
+        const { packageName, lineItems } = req.body;
+        
+        // Get package template ID
+        const pkgResult = await pool.query('SELECT id FROM package_templates WHERE name = $1', [packageName]);
+        if (pkgResult.rows.length === 0) {
+            return res.json({ matches: false });
+        }
+        const packageTemplateId = pkgResult.rows[0].id;
+        
+        // Get current defaults
+        const defaultsResult = await pool.query(`
+            SELECT description, default_qty, default_cost, default_price 
+            FROM line_item_templates 
+            WHERE package_template_id = $1 
+            ORDER BY description
+        `, [packageTemplateId]);
+        
+        const defaults = defaultsResult.rows;
+        
+        // Check if counts match
+        if (defaults.length !== lineItems.length) {
+            return res.json({ matches: false });
+        }
+        
+        // Sort both arrays by description for comparison
+        const sortedDefaults = defaults.sort((a, b) => a.description.localeCompare(b.description));
+        const sortedItems = [...lineItems].sort((a, b) => a.description.localeCompare(b.description));
+        
+        // Compare each item
+        const matches = sortedDefaults.every((def, idx) => {
+            const item = sortedItems[idx];
+            return def.description === item.description &&
+                   parseFloat(def.default_qty) === parseFloat(item.qty) &&
+                   parseFloat(def.default_cost) === parseFloat(item.cost) &&
+                   parseFloat(def.default_price) === parseFloat(item.price);
+        });
+        
+        res.json({ matches });
+    } catch (err) {
+        console.error('Error checking defaults:', err);
+        res.status(500).json({ error: 'Failed to check defaults' });
     }
 });
 

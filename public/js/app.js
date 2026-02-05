@@ -2312,6 +2312,9 @@ const app = {
 
             // Find contractor assigned to this category
             const assignedContractor = this.getContractorForCategory(category);
+            
+            // Create placeholder for default button
+            const defaultButtonId = `default-btn-${category.replace(/[^a-zA-Z0-9]/g, '_')}`;
 
             header.innerHTML = `
                 <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
@@ -2322,6 +2325,9 @@ const app = {
                             <span style="color: ${assignedContractor ? '#0369a1' : '#6b7280'};">${assignedContractor ? `👷 ${assignedContractor}` : 'No contractor assigned'}</span>
                             <button onclick="app.editContractorAssignment('${category}')" style="background: none; border: none; cursor: pointer; padding: 2px; font-size: 14px;" title="Edit contractor">✏️</button>
                         </div>
+                        <div id="${defaultButtonId}" style="margin-left: 10px;">
+                            <span style="color: #9ca3af; font-size: 13px;">Checking...</span>
+                        </div>
                     ` : ''}
                 </div>
                 <div class="category-header-buttons">
@@ -2331,6 +2337,28 @@ const app = {
                 </div>
             `;
             section.appendChild(header);
+            
+            // Check if package matches defaults (async, after render)
+            if (this.data.mode !== 'contractor') {
+                this.checkPackageMatchesDefaults(category).then(matches => {
+                    const defaultBtnContainer = document.getElementById(defaultButtonId);
+                    if (defaultBtnContainer) {
+                        if (matches) {
+                            defaultBtnContainer.innerHTML = `
+                                <span style="padding: 4px 10px; background: #d1fae5; color: #065f46; border-radius: 4px; font-size: 13px; font-weight: 600;">
+                                    ✓ Default
+                                </span>
+                            `;
+                        } else {
+                            defaultBtnContainer.innerHTML = `
+                                <button class="btn-header" style="background: #3b82f6; font-size: 13px;" onclick="app.savePackageAsDefaults('${category}')">
+                                    💾 Save as Default
+                                </button>
+                            `;
+                        }
+                    }
+                });
+            }
             
             // Upcharge dropdown (owner mode only)
             const upchargePercent = this.data.sectionUpcharges?.[category] || 0;
@@ -3561,6 +3589,72 @@ const app = {
         setTimeout(() => {
             notification.classList.remove('show');
         }, duration);
+    },
+
+    // Check if current package items match defaults
+    async checkPackageMatchesDefaults(packageName) {
+        try {
+            const packageItems = this.data.items.filter(item => item.category === packageName);
+            const lineItems = packageItems.map(item => ({
+                description: item.description,
+                qty: parseFloat(item.qty) || 0,
+                cost: parseFloat(item.cost) || 0,
+                price: parseFloat(item.price) || 0
+            }));
+
+            const response = await fetch('/api/package-templates/check-defaults', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ packageName, lineItems })
+            });
+
+            const result = await response.json();
+            return result.matches || false;
+        } catch (error) {
+            console.error('Error checking defaults:', error);
+            return false;
+        }
+    },
+
+    // Save current package items as defaults
+    async savePackageAsDefaults(packageName) {
+        const packageItems = this.data.items.filter(item => item.category === packageName);
+        
+        if (packageItems.length === 0) {
+            this.showNotification('⚠️ No items to save as defaults');
+            return;
+        }
+
+        const confirmed = confirm(`Save these ${packageItems.length} line items as the default template for "${packageName}"?\n\nThis will replace any existing defaults for this package.`);
+        if (!confirmed) return;
+
+        try {
+            const lineItems = packageItems.map(item => ({
+                description: item.description,
+                qty: parseFloat(item.qty) || 0,
+                cost: parseFloat(item.cost) || 0,
+                price: parseFloat(item.price) || 0
+            }));
+
+            const response = await fetch('/api/package-templates/save-defaults', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ packageName, lineItems })
+            });
+
+            const result = await response.json();
+            
+            if (response.ok) {
+                this.showNotification(`✓ Saved ${lineItems.length} items as default for "${packageName}"`);
+                // Re-render to show "Default" badge
+                this.renderItems();
+            } else {
+                throw new Error(result.error || 'Failed to save defaults');
+            }
+        } catch (error) {
+            console.error('Error saving defaults:', error);
+            this.showNotification('⚠️ Failed to save defaults: ' + error.message, 5000);
+        }
     }
 };
 
