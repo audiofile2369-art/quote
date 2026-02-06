@@ -8,6 +8,7 @@ const app = {
         quoteDate: '',
         quoteNumber: '',
         companyName: 'Petroleum Network Solutions',
+        companyLogoUrl: '',
         contactName: 'Thomas Lyons',
         phone: '817-888-6167',
         email: 'tlyons@petronetwrksolutions.com',
@@ -26,6 +27,7 @@ const app = {
         todos: [], // [{ id, text, priority, deadline, completed, completedAt }] - general todos
         sectionTodos: {}, // { 'package': [{ id, text, priority, deadline, completed, completedAt }] }
         contractorAssignments: {}, // { 'contractorName': ['Package A', 'Package B'] }
+        contractorLogos: {}, // { 'contractorName': 'logoUrl or base64' }
         meetings: [], // [{ id, title, datetime, location, notes, createdAt }]
         sectionMeetings: {}, // { 'package': [meeting objects] }
         criticalJunctures: [], // [{ id, date, description, assignedPerson, createdAt }]
@@ -2745,6 +2747,7 @@ const app = {
         this.data.quoteDate = document.getElementById('quoteDate')?.value || '';
         this.data.quoteNumber = document.getElementById('quoteNumber')?.value || '';
         this.data.companyName = document.getElementById('companyName')?.value || '';
+        this.data.companyLogoUrl = document.getElementById('companyLogoUrl')?.value || '';
         this.data.contactName = document.getElementById('contactName')?.value || '';
         this.data.phone = document.getElementById('phone')?.value || '';
         this.data.email = document.getElementById('email')?.value || '';
@@ -2976,6 +2979,7 @@ const app = {
         document.getElementById('quoteDate').value = this.data.quoteDate || '';
         document.getElementById('quoteNumber').value = this.data.quoteNumber || '';
         document.getElementById('companyName').value = this.data.companyName || '';
+        document.getElementById('companyLogoUrl').value = this.data.companyLogoUrl || '';
         document.getElementById('contactName').value = this.data.contactName || '';
         document.getElementById('phone').value = this.data.phone || '';
         document.getElementById('email').value = this.data.email || '';
@@ -2985,6 +2989,11 @@ const app = {
         document.getElementById('paymentTerms').value = this.data.paymentTerms || '';
         document.getElementById('scopeOfWork').value = this.data.scopeOfWork || '';
         document.getElementById('disclaimers').value = this.data.disclaimers || '';
+        
+        // Render logo preview if exists
+        if (this.data.companyLogoUrl) {
+            this.renderLogoPreview('company', this.data.companyLogoUrl);
+        }
     },
 
     exportJSON() {
@@ -3713,6 +3722,66 @@ const app = {
         setTimeout(() => {
             notification.classList.remove('show');
         }, duration);
+    },
+
+    // Handle logo file upload
+    handleLogoUpload(event, type) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        if (!file.type.startsWith('image/')) {
+            this.showNotification('⚠️ Please select an image file', 3000);
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const base64 = e.target.result;
+            
+            if (type === 'company') {
+                document.getElementById('companyLogoUrl').value = base64;
+                this.data.companyLogoUrl = base64;
+                this.renderLogoPreview('company', base64);
+            } else if (type === 'contractor') {
+                // This will be handled in contractor assignment modal
+                const contractorName = event.target.dataset.contractor;
+                if (contractorName) {
+                    this.data.contractorLogos[contractorName] = base64;
+                }
+            }
+            
+            this.save();
+            this.showNotification('✓ Logo uploaded!');
+        };
+        
+        reader.readAsDataURL(file);
+    },
+
+    renderLogoPreview(type, logoUrl) {
+        if (!logoUrl) return;
+        
+        const previewId = type === 'company' ? 'companyLogoPreview' : `${type}LogoPreview`;
+        const preview = document.getElementById(previewId);
+        if (!preview) return;
+        
+        preview.innerHTML = `
+            <div style="border: 1px solid #dee2e6; border-radius: 6px; padding: 10px; display: inline-block; background: #f8f9fa;">
+                <img src="${logoUrl}" style="max-width: 200px; max-height: 100px; display: block;" alt="Logo preview">
+                <button onclick="app.removeLogo('${type}')" style="margin-top: 8px; background: #dc3545; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                    Remove Logo
+                </button>
+            </div>
+        `;
+    },
+
+    removeLogo(type) {
+        if (type === 'company') {
+            this.data.companyLogoUrl = '';
+            document.getElementById('companyLogoUrl').value = '';
+            document.getElementById('companyLogoPreview').innerHTML = '';
+        }
+        this.save();
+        this.showNotification('✓ Logo removed');
     },
 
     // Check if current package items match defaults

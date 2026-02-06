@@ -174,6 +174,26 @@ async function initDB() {
                 END IF;
             END $$;
         `);
+        
+        // Add company_logo_url column if it doesn't exist
+        await client.query(`
+            DO $$
+            BEGIN
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='jobs' AND column_name='company_logo_url') THEN
+                    ALTER TABLE jobs ADD COLUMN company_logo_url TEXT;
+                END IF;
+            END $$;
+        `);
+        
+        // Add contractor_logos column if it doesn't exist
+        await client.query(`
+            DO $$
+            BEGIN
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='jobs' AND column_name='contractor_logos') THEN
+                    ALTER TABLE jobs ADD COLUMN contractor_logos JSONB DEFAULT '{}';
+                END IF;
+            END $$;
+        `);
 
         // Create contractor_links table for short URLs
         await client.query(`
@@ -473,11 +493,11 @@ app.post('/api/jobs', async (req, res) => {
         const jobResult = await client.query(`
             INSERT INTO jobs (
                 station_name, client_name, site_address, quote_date, quote_number,
-                company_name, contact_name, phone, email,
+                company_name, company_logo_url, contact_name, phone, email,
                 project_notes, tax_rate, discount, payment_terms,
-                scope_of_work, disclaimers, files, section_scopes, section_disclaimers, contractor_section_disclaimers, section_upcharges, contractor_assignments,
+                scope_of_work, disclaimers, files, section_scopes, section_disclaimers, contractor_section_disclaimers, section_upcharges, contractor_assignments, contractor_logos,
                 todos, section_todos, meetings, section_meetings, critical_junctures, testing_calibration, testing_assignments, testing_schedules
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29)
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32)
             RETURNING id
         `, [
             req.body.stationName,
@@ -486,6 +506,7 @@ app.post('/api/jobs', async (req, res) => {
             req.body.quoteDate || null,
             req.body.quoteNumber,
             req.body.companyName,
+            req.body.companyLogoUrl,
             req.body.contactName,
             req.body.phone,
             req.body.email,
@@ -501,6 +522,7 @@ app.post('/api/jobs', async (req, res) => {
             JSON.stringify(req.body.contractorSectionDisclaimers || {}),
             JSON.stringify(req.body.sectionUpcharges || {}),
             JSON.stringify(req.body.contractorAssignments || {}),
+            JSON.stringify(req.body.contractorLogos || {}),
             JSON.stringify(req.body.todos || []),
             JSON.stringify(req.body.sectionTodos || {}),
             JSON.stringify(req.body.meetings || []),
@@ -584,12 +606,12 @@ app.put('/api/jobs/:id', async (req, res) => {
         await client.query(`
             UPDATE jobs SET
                 station_name = $1, client_name = $2, site_address = $3, quote_date = $4, quote_number = $5,
-                company_name = $6, contact_name = $7, phone = $8, email = $9,
-                project_notes = $10, tax_rate = $11, discount = $12, payment_terms = $13,
-                scope_of_work = $14, disclaimers = $15, files = $16,
-                section_scopes = $17, section_disclaimers = $18, contractor_section_disclaimers = $19, section_upcharges = $20, contractor_assignments = $21,
-                todos = $22, section_todos = $23, meetings = $24, section_meetings = $25, critical_junctures = $26, testing_calibration = $27, testing_assignments = $28, testing_schedules = $29, updated_at = NOW()
-            WHERE id = $30
+                company_name = $6, company_logo_url = $7, contact_name = $8, phone = $9, email = $10,
+                project_notes = $11, tax_rate = $12, discount = $13, payment_terms = $14,
+                scope_of_work = $15, disclaimers = $16, files = $17,
+                section_scopes = $18, section_disclaimers = $19, contractor_section_disclaimers = $20, section_upcharges = $21, contractor_assignments = $22, contractor_logos = $23,
+                todos = $24, section_todos = $25, meetings = $26, section_meetings = $27, critical_junctures = $28, testing_calibration = $29, testing_assignments = $30, testing_schedules = $31, updated_at = NOW()
+            WHERE id = $32
         `, [
             req.body.stationName,
             req.body.clientName,
@@ -597,6 +619,7 @@ app.put('/api/jobs/:id', async (req, res) => {
             req.body.quoteDate || null,
             req.body.quoteNumber,
             req.body.companyName,
+            req.body.companyLogoUrl,
             req.body.contactName,
             req.body.phone,
             req.body.email,
@@ -612,6 +635,7 @@ app.put('/api/jobs/:id', async (req, res) => {
             JSON.stringify(req.body.contractorSectionDisclaimers || {}),
             JSON.stringify(req.body.sectionUpcharges || {}),
             JSON.stringify(req.body.contractorAssignments || {}),
+            JSON.stringify(req.body.contractorLogos || {}),
             JSON.stringify(req.body.todos || []),
             JSON.stringify(req.body.sectionTodos || {}),
             JSON.stringify(req.body.meetings || []),

@@ -89,6 +89,18 @@
                 </div>
             </div>
             
+            <h3>Company Logo</h3>
+            <div class="form-group">
+                <label>Logo Image URL or Upload</label>
+                <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 10px;">
+                    <input type="text" id="companyLogoUrl" placeholder="https://yoursite.com/logo.png or paste base64" onchange="app.save()" style="flex: 1;">
+                    <button onclick="document.getElementById('logoUpload').click()" class="btn" style="background: #3b82f6; padding: 10px 20px;">📁 Upload</button>
+                    <input type="file" id="logoUpload" accept="image/*" style="display: none;" onchange="app.handleLogoUpload(event, 'company')">
+                </div>
+                <div id="companyLogoPreview" style="margin-top: 10px;"></div>
+                <small style="color: #666;">Logo will appear in PDF header. Recommended: 200x80px PNG with transparent background.</small>
+            </div>
+            
             <div style="margin-top: 20px;">
                 <button onclick="(async () => { await app.save(); await app.saveToDatabase(true); })();" class="btn" style="width: 100%; padding: 15px; font-size: 16px; background: #28a745; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">
                     💾 Save Project Info
