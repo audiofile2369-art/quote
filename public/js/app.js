@@ -3433,7 +3433,14 @@ const app = {
         let currentCategory = '';
         const categories = [];
 
-        this.data.items.forEach((item, idx) => {
+        // Sort items by category to keep packages together
+        const sortedItems = [...this.data.items].sort((a, b) => {
+            const catA = a.category || 'Uncategorized';
+            const catB = b.category || 'Uncategorized';
+            return catA.localeCompare(catB);
+        });
+
+        sortedItems.forEach((item, idx) => {
             // If category changed, add section total for previous category
             if (item.category && item.category !== currentCategory) {
                 // Add section total for previous category
@@ -3447,7 +3454,10 @@ const app = {
                 }
 
                 currentCategory = item.category;
-                categories.push(currentCategory); // Track for scopes later
+                // Only add to categories array if not already present
+                if (!categories.includes(currentCategory)) {
+                    categories.push(currentCategory); // Track for scopes later
+                }
                 tableBody.push([
                     { text: currentCategory, colSpan: 4, bold: true, color: '#c41e3a', fillColor: '#e8e8e8', margin: [0, 8, 0, 5] },
                     {},
