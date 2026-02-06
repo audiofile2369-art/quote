@@ -3646,6 +3646,12 @@ const app = {
     },
 
     generatePDFActual(orderedCategories) {
+        // Define professional colors
+        const primaryColor = '#1a365d';  // Dark navy blue
+        const accentColor = '#c41e3a';   // Red accent
+        const lightGray = '#f7fafc';
+        const mediumGray = '#e2e8f0';
+        const darkGray = '#4a5568';
 
         // Calculate category totals for breakdown
         const categoryTotals = {};
@@ -3661,54 +3667,119 @@ const app = {
 
         // Build price breakdown by section (using ordered categories)
         const breakdownBody = [
-            [{ text: 'Equipment Package', style: 'tableHeader' }, { text: 'Amount', style: 'tableHeader', alignment: 'right' }]
+            [
+                { text: 'Equipment Package', style: 'tableHeaderPrimary', alignment: 'left' }, 
+                { text: 'Amount', style: 'tableHeaderPrimary', alignment: 'right' }
+            ]
         ];
-        orderedCategories.forEach(cat => {
+        orderedCategories.forEach((cat, idx) => {
             if (categoryTotals[cat]) {
-                breakdownBody.push([cat, { text: '$' + this.formatCurrency(categoryTotals[cat]), alignment: 'right' }]);
+                breakdownBody.push([
+                    { text: cat, fillColor: idx % 2 === 0 ? lightGray : '#ffffff', margin: [5, 6, 5, 6] }, 
+                    { text: '$' + this.formatCurrency(categoryTotals[cat]), alignment: 'right', fillColor: idx % 2 === 0 ? lightGray : '#ffffff', margin: [5, 6, 5, 6] }
+                ]);
             }
         });
+        // Add subtotal row to breakdown
+        breakdownBody.push([
+            { text: 'PROJECT TOTAL', bold: true, fillColor: primaryColor, color: '#ffffff', margin: [5, 8, 5, 8] },
+            { text: '$' + this.formatCurrency(grandTotal), bold: true, alignment: 'right', fillColor: primaryColor, color: '#ffffff', margin: [5, 8, 5, 8] }
+        ]);
 
         // Build content array
-        const content = [
-            { text: 'PROJECT ESTIMATE', style: 'title', alignment: 'center' },
-            { text: this.data.stationName || this.data.siteAddress || this.data.clientName || '[Project Site]', style: 'siteName', alignment: 'center' }
-        ];
+        const content = [];
         
-        // Add company logo if available
+        // Header section with logo
         if (this.data.companyLogoUrl) {
             content.push({
-                image: this.data.companyLogoUrl,
-                width: 150,
-                alignment: 'center',
-                margin: [0, 10, 0, 10]
+                columns: [
+                    { 
+                        image: this.data.companyLogoUrl, 
+                        width: 120,
+                        margin: [0, 0, 0, 0]
+                    },
+                    {
+                        stack: [
+                            { text: 'PROJECT ESTIMATE', style: 'title', alignment: 'right' },
+                            { text: this.data.stationName || this.data.siteAddress || '[Project Site]', style: 'siteName', alignment: 'right' }
+                        ],
+                        margin: [0, 10, 0, 0]
+                    }
+                ],
+                columnGap: 20,
+                margin: [0, 0, 0, 15]
             });
+        } else {
+            content.push(
+                { text: 'PROJECT ESTIMATE', style: 'title', alignment: 'center' },
+                { text: this.data.stationName || this.data.siteAddress || '[Project Site]', style: 'siteName', alignment: 'center', margin: [0, 0, 0, 15] }
+            );
         }
         
-        content.push(
-            { text: this.data.companyName || 'Your Company', style: 'company', alignment: 'center' },
-            { text: `${this.data.phone} | ${this.data.email}`, style: 'contact', alignment: 'center' },
-            { text: '\n' },
-
-            { text: 'Prepared For:', style: 'sectionHeader' },
-            { text: this.data.clientName || '[Client Name]', bold: true },
-            { text: this.data.siteAddress || '[Site Address]' },
-            { text: `Date: ${this.data.quoteDate || new Date().toISOString().split('T')[0]}` },
-            { text: `Estimate #: ${this.data.quoteNumber || 'N/A'}` },
-            { text: '\n' },
-
-            { text: 'PRICE BREAKDOWN BY PACKAGE', style: 'sectionHeader' },
-            {
-                table: {
-                    widths: ['*', 100],
-                    body: breakdownBody
+        // Horizontal divider
+        content.push({
+            canvas: [{ type: 'line', x1: 0, y1: 0, x2: 515, y2: 0, lineWidth: 2, lineColor: primaryColor }],
+            margin: [0, 5, 0, 15]
+        });
+        
+        // Company and client info in columns
+        content.push({
+            columns: [
+                {
+                    width: '50%',
+                    stack: [
+                        { text: 'FROM:', style: 'labelText' },
+                        { text: this.data.companyName || 'Your Company', bold: true, fontSize: 12, margin: [0, 3, 0, 2] },
+                        { text: this.data.phone || '', fontSize: 10, color: darkGray },
+                        { text: this.data.email || '', fontSize: 10, color: darkGray }
+                    ]
                 },
-                layout: 'lightHorizontalLines'
+                {
+                    width: '50%',
+                    stack: [
+                        { text: 'PREPARED FOR:', style: 'labelText' },
+                        { text: this.data.clientName || '[Client Name]', bold: true, fontSize: 12, margin: [0, 3, 0, 2] },
+                        { text: this.data.siteAddress || '[Site Address]', fontSize: 10, color: darkGray }
+                    ]
+                }
+            ],
+            columnGap: 30,
+            margin: [0, 0, 0, 15]
+        });
+        
+        // Estimate details box
+        content.push({
+            table: {
+                widths: ['auto', '*', 'auto', '*'],
+                body: [[
+                    { text: 'Estimate #:', bold: true, border: [false, false, false, false], margin: [0, 8, 5, 8] },
+                    { text: this.data.quoteNumber || 'N/A', border: [false, false, false, false], margin: [0, 8, 15, 8] },
+                    { text: 'Date:', bold: true, border: [false, false, false, false], margin: [0, 8, 5, 8] },
+                    { text: this.data.quoteDate || new Date().toISOString().split('T')[0], border: [false, false, false, false], margin: [0, 8, 0, 8] }
+                ]]
             },
-            { text: '\n' },
+            layout: {
+                fillColor: function() { return lightGray; }
+            },
+            margin: [0, 0, 0, 20]
+        });
 
-            { text: 'DETAILED LINE ITEMS', style: 'sectionHeader' }
-        );
+        // Price Summary Section
+        content.push({ text: 'PRICE SUMMARY', style: 'sectionHeader' });
+        content.push({
+            table: {
+                widths: ['*', 120],
+                body: breakdownBody
+            },
+            layout: {
+                hLineWidth: function(i, node) { return (i === 0 || i === 1 || i === node.table.body.length) ? 1 : 0.5; },
+                vLineWidth: function() { return 0; },
+                hLineColor: function(i, node) { return (i === 0 || i === node.table.body.length) ? primaryColor : mediumGray; },
+                paddingLeft: function() { return 0; },
+                paddingRight: function() { return 0; }
+            },
+            margin: [0, 0, 0, 25]
+        });
 
         // For each category in order, add line items + scope + disclaimers
         orderedCategories.forEach((category, catIndex) => {
@@ -3720,41 +3791,53 @@ const app = {
             const assignedContractor = this.getContractorForCategory(category);
             const contractorLogo = assignedContractor && this.data.contractorLogos ? this.data.contractorLogos[assignedContractor] : null;
 
+            // Package header with optional page break
+            if (catIndex > 0) {
+                content.push({ text: '', pageBreak: 'before' });
+            }
+            
+            // Package title bar
+            content.push({
+                table: {
+                    widths: ['*'],
+                    body: [[{ text: category.toUpperCase(), bold: true, fontSize: 12, color: '#ffffff', margin: [10, 8, 10, 8] }]]
+                },
+                layout: {
+                    fillColor: function() { return primaryColor; },
+                    hLineWidth: function() { return 0; },
+                    vLineWidth: function() { return 0; }
+                },
+                margin: [0, 0, 0, 0]
+            });
+
             // Build table for this category
             const tableBody = [
                 [
-                    { text: 'Description', style: 'tableHeader' },
-                    { text: 'QTY', style: 'tableHeader', alignment: 'center' },
-                    { text: 'Unit Price', style: 'tableHeader', alignment: 'right' },
-                    { text: 'Total', style: 'tableHeader', alignment: 'right' }
+                    { text: 'Description', style: 'tableHeaderSecondary', alignment: 'left' },
+                    { text: 'QTY', style: 'tableHeaderSecondary', alignment: 'center' },
+                    { text: 'Unit Price', style: 'tableHeaderSecondary', alignment: 'right' },
+                    { text: 'Total', style: 'tableHeaderSecondary', alignment: 'right' }
                 ]
             ];
 
-            // Add category header
-            tableBody.push([
-                { text: category, colSpan: 4, bold: true, color: '#c41e3a', fillColor: '#e8e8e8', margin: [0, 8, 0, 5] },
-                {},
-                {},
-                {}
-            ]);
-
-            // Add items
-            categoryItems.forEach(item => {
+            // Add items with alternating rows
+            categoryItems.forEach((item, idx) => {
                 const total = (item.qty || 0) * (item.price || 0);
+                const rowColor = idx % 2 === 0 ? '#ffffff' : lightGray;
                 tableBody.push([
-                    item.description || '',
-                    { text: (item.qty || 0).toString(), alignment: 'center' },
-                    { text: '$' + this.formatCurrency(item.price || 0), alignment: 'right' },
-                    { text: '$' + this.formatCurrency(total), alignment: 'right' }
+                    { text: item.description || '', fillColor: rowColor, margin: [5, 5, 5, 5] },
+                    { text: (item.qty || 0).toString(), alignment: 'center', fillColor: rowColor, margin: [5, 5, 5, 5] },
+                    { text: '$' + this.formatCurrency(item.price || 0), alignment: 'right', fillColor: rowColor, margin: [5, 5, 5, 5] },
+                    { text: '$' + this.formatCurrency(total), alignment: 'right', fillColor: rowColor, margin: [5, 5, 5, 5] }
                 ]);
             });
 
-            // Add category total
+            // Add category total row
             tableBody.push([
-                { text: `${category} Total:`, colSpan: 3, bold: true, alignment: 'right', fillColor: '#f8f9fa' },
+                { text: 'Package Total:', colSpan: 3, bold: true, alignment: 'right', fillColor: mediumGray, margin: [5, 8, 10, 8] },
                 {},
                 {},
-                { text: '$' + this.formatCurrency(categoryTotals[category]), bold: true, alignment: 'right', fillColor: '#f8f9fa' }
+                { text: '$' + this.formatCurrency(categoryTotals[category]), bold: true, alignment: 'right', fillColor: mediumGray, margin: [5, 8, 5, 8] }
             ]);
 
             // Add the table to content
@@ -3763,111 +3846,226 @@ const app = {
                     widths: ['*', 50, 80, 80],
                     body: tableBody
                 },
-                layout: 'lightHorizontalLines',
-                pageBreak: catIndex === 0 ? undefined : 'before' // Page break before each package except first
+                layout: {
+                    hLineWidth: function(i, node) { return (i === 0 || i === 1 || i === node.table.body.length) ? 1 : 0.5; },
+                    vLineWidth: function() { return 0.5; },
+                    hLineColor: function() { return mediumGray; },
+                    vLineColor: function() { return mediumGray; }
+                },
+                margin: [0, 0, 0, 10]
             });
             
-            // Add contractor logo if assigned
+            // Add contractor info if assigned
             if (contractorLogo) {
                 content.push({
                     columns: [
-                        { text: `Contractor: ${assignedContractor}`, bold: true, fontSize: 10, color: '#666', margin: [0, 8, 0, 0] },
-                        { image: contractorLogo, width: 80, alignment: 'right', margin: [0, 4, 0, 0] }
+                        { text: `Assigned Contractor: ${assignedContractor}`, fontSize: 10, color: darkGray, italics: true, margin: [0, 5, 0, 0] },
+                        { image: contractorLogo, width: 70, alignment: 'right', margin: [0, 0, 0, 0] }
                     ],
-                    columnGap: 10
+                    columnGap: 10,
+                    margin: [0, 5, 0, 10]
                 });
             } else if (assignedContractor) {
-                content.push({ text: `Contractor: ${assignedContractor}`, bold: true, fontSize: 10, color: '#666', margin: [0, 8, 0, 4] });
+                content.push({ 
+                    text: `Assigned Contractor: ${assignedContractor}`, 
+                    fontSize: 10, 
+                    color: darkGray, 
+                    italics: true,
+                    margin: [0, 5, 0, 10] 
+                });
             }
 
             // Add scope of work for this package if present
             if (this.data.sectionScopes && this.data.sectionScopes[category]) {
-                content.push({ text: `\n${category} - Scope of Work`, bold: true, fontSize: 11, color: '#c41e3a', margin: [0, 8, 0, 4] });
-                content.push({ text: this.data.sectionScopes[category], fontSize: 10, margin: [0, 0, 0, 8] });
+                content.push({
+                    table: {
+                        widths: ['*'],
+                        body: [
+                            [{ text: 'Scope of Work', bold: true, fontSize: 10, color: primaryColor, margin: [8, 6, 8, 4] }],
+                            [{ text: this.data.sectionScopes[category], fontSize: 9, color: darkGray, margin: [8, 0, 8, 6] }]
+                        ]
+                    },
+                    layout: {
+                        hLineWidth: function() { return 0; },
+                        vLineWidth: function(i) { return i === 0 ? 3 : 0; },
+                        vLineColor: function() { return accentColor; },
+                        fillColor: function() { return lightGray; }
+                    },
+                    margin: [0, 5, 0, 8]
+                });
             }
 
             // Add disclaimers for this package if present
             if (this.data.sectionDisclaimers && this.data.sectionDisclaimers[category]) {
-                content.push({ text: `\n${category} - Disclaimers`, bold: true, fontSize: 11, color: '#c41e3a', margin: [0, 8, 0, 4] });
-                content.push({ text: this.data.sectionDisclaimers[category], fontSize: 10, margin: [0, 0, 0, 12] });
+                content.push({
+                    table: {
+                        widths: ['*'],
+                        body: [
+                            [{ text: 'Disclaimers', bold: true, fontSize: 10, color: primaryColor, margin: [8, 6, 8, 4] }],
+                            [{ text: this.data.sectionDisclaimers[category], fontSize: 9, color: darkGray, margin: [8, 0, 8, 6] }]
+                        ]
+                    },
+                    layout: {
+                        hLineWidth: function() { return 0; },
+                        vLineWidth: function(i) { return i === 0 ? 3 : 0; },
+                        vLineColor: function() { return '#f59e0b'; },
+                        fillColor: function() { return '#fffbeb'; }
+                    },
+                    margin: [0, 5, 0, 10]
+                });
             }
         });
 
-        // Add totals
-        content.push({ text: '\n' });
+        // Grand Total Section
         content.push({
-            table: {
-                widths: ['*', 120],
-                body: [
-                    ['Subtotal:', { text: '$' + this.formatCurrency(subtotal), alignment: 'right' }],
-                    [`Tax (${this.data.taxRate}%):`, { text: '$' + this.formatCurrency(taxAmount), alignment: 'right' }],
-                    ['Discount:', { text: '-$' + this.formatCurrency(this.data.discount), alignment: 'right' }],
-                    [
-                        { text: 'TOTAL:', bold: true, fontSize: 12 },
-                        { text: '$' + this.formatCurrency(grandTotal), bold: true, alignment: 'right', fontSize: 14 }
-                    ]
-                ]
-            },
-            layout: 'noBorders'
+            canvas: [{ type: 'line', x1: 0, y1: 0, x2: 515, y2: 0, lineWidth: 1, lineColor: mediumGray }],
+            margin: [0, 20, 0, 15]
+        });
+        
+        content.push({
+            columns: [
+                { width: '*', text: '' },
+                {
+                    width: 250,
+                    table: {
+                        widths: ['*', 100],
+                        body: [
+                            [
+                                { text: 'Subtotal:', alignment: 'right', margin: [0, 4, 10, 4] },
+                                { text: '$' + this.formatCurrency(subtotal), alignment: 'right', margin: [0, 4, 0, 4] }
+                            ],
+                            [
+                                { text: `Tax (${this.data.taxRate}%):`, alignment: 'right', margin: [0, 4, 10, 4] },
+                                { text: '$' + this.formatCurrency(taxAmount), alignment: 'right', margin: [0, 4, 0, 4] }
+                            ],
+                            [
+                                { text: 'Discount:', alignment: 'right', margin: [0, 4, 10, 4] },
+                                { text: '-$' + this.formatCurrency(this.data.discount), alignment: 'right', margin: [0, 4, 0, 4] }
+                            ],
+                            [
+                                { text: 'GRAND TOTAL:', bold: true, fontSize: 14, alignment: 'right', fillColor: primaryColor, color: '#ffffff', margin: [0, 10, 10, 10] },
+                                { text: '$' + this.formatCurrency(grandTotal), bold: true, fontSize: 14, alignment: 'right', fillColor: primaryColor, color: '#ffffff', margin: [0, 10, 0, 10] }
+                            ]
+                        ]
+                    },
+                    layout: {
+                        hLineWidth: function(i, node) { return i === node.table.body.length - 1 ? 0 : 0.5; },
+                        vLineWidth: function() { return 0; },
+                        hLineColor: function() { return mediumGray; }
+                    }
+                }
+            ],
+            margin: [0, 0, 0, 25]
         });
 
         // Add general scope of work if present
         if (this.data.scopeOfWork) {
-            content.push({ text: '\nGENERAL SCOPE OF WORK', style: 'sectionHeader' });
-            content.push({ text: this.data.scopeOfWork, fontSize: 10 });
+            content.push({ text: 'GENERAL SCOPE OF WORK', style: 'sectionHeader' });
+            content.push({
+                table: {
+                    widths: ['*'],
+                    body: [[{ text: this.data.scopeOfWork, fontSize: 9, color: darkGray, margin: [10, 8, 10, 8] }]]
+                },
+                layout: {
+                    hLineWidth: function() { return 1; },
+                    vLineWidth: function() { return 1; },
+                    hLineColor: function() { return mediumGray; },
+                    vLineColor: function() { return mediumGray; }
+                },
+                margin: [0, 0, 0, 15]
+            });
         }
 
         // Add general disclaimers if present
         if (this.data.disclaimers) {
-            content.push({ text: '\nGENERAL DISCLAIMERS', style: 'sectionHeader' });
-            content.push({ text: this.data.disclaimers, fontSize: 10 });
+            content.push({ text: 'GENERAL DISCLAIMERS', style: 'sectionHeader' });
+            content.push({
+                table: {
+                    widths: ['*'],
+                    body: [[{ text: this.data.disclaimers, fontSize: 9, color: darkGray, margin: [10, 8, 10, 8] }]]
+                },
+                layout: {
+                    hLineWidth: function() { return 1; },
+                    vLineWidth: function() { return 1; },
+                    hLineColor: function() { return '#f59e0b'; },
+                    vLineColor: function() { return '#f59e0b'; },
+                    fillColor: function() { return '#fffbeb'; }
+                },
+                margin: [0, 0, 0, 15]
+            });
         }
 
         // Add payment terms if present
         if (this.data.paymentTerms) {
-            content.push({ text: '\nPAYMENT TERMS', style: 'sectionHeader' });
-            content.push({ text: this.data.paymentTerms, fontSize: 10 });
+            content.push({ text: 'PAYMENT TERMS', style: 'sectionHeader' });
+            content.push({
+                table: {
+                    widths: ['*'],
+                    body: [[{ text: this.data.paymentTerms, fontSize: 9, color: darkGray, margin: [10, 8, 10, 8] }]]
+                },
+                layout: {
+                    hLineWidth: function() { return 1; },
+                    vLineWidth: function() { return 1; },
+                    hLineColor: function() { return mediumGray; },
+                    vLineColor: function() { return mediumGray; },
+                    fillColor: function() { return lightGray; }
+                },
+                margin: [0, 0, 0, 15]
+            });
         }
 
         const docDefinition = {
             pageSize: 'LETTER',
-            pageMargins: [40, 60, 40, 60],
+            pageMargins: [40, 40, 40, 60],
             content: content,
+            footer: function(currentPage, pageCount) {
+                return {
+                    columns: [
+                        { text: 'This estimate is valid for 30 days from the date issued.', fontSize: 8, color: darkGray, italics: true, margin: [40, 0, 0, 0] },
+                        { text: `Page ${currentPage} of ${pageCount}`, fontSize: 8, color: darkGray, alignment: 'right', margin: [0, 0, 40, 0] }
+                    ],
+                    margin: [0, 20, 0, 0]
+                };
+            },
             styles: {
                 title: {
-                    fontSize: 24,
+                    fontSize: 26,
                     bold: true,
-                    color: '#c41e3a',
+                    color: primaryColor,
                     margin: [0, 0, 0, 5]
                 },
                 siteName: {
-                    fontSize: 18,
+                    fontSize: 16,
                     bold: true,
-                    color: '#333',
+                    color: darkGray,
                     margin: [0, 0, 0, 10]
                 },
-                company: {
-                    fontSize: 14,
+                labelText: {
+                    fontSize: 9,
                     bold: true,
-                    margin: [0, 5, 0, 5]
-                },
-                contact: {
-                    fontSize: 10,
-                    color: '#666',
-                    margin: [0, 0, 0, 20]
+                    color: accentColor,
+                    margin: [0, 0, 0, 2]
                 },
                 sectionHeader: {
                     fontSize: 12,
                     bold: true,
-                    color: '#c41e3a',
-                    margin: [0, 15, 0, 8]
+                    color: primaryColor,
+                    margin: [0, 10, 0, 8]
                 },
-                tableHeader: {
+                tableHeaderPrimary: {
                     bold: true,
-                    fillColor: '#f0f0f0'
+                    fontSize: 10,
+                    color: '#ffffff',
+                    fillColor: primaryColor,
+                    margin: [5, 8, 5, 8]
+                },
+                tableHeaderSecondary: {
+                    bold: true,
+                    fontSize: 9,
+                    fillColor: mediumGray,
+                    margin: [5, 6, 5, 6]
                 }
             },
-
             defaultStyle: {
                 fontSize: 10
             }
