@@ -3373,10 +3373,9 @@ const app = {
     },
 
     closeModal() {
-        const modal = document.querySelector('.modal');
+        const modal = document.getElementById('modal');
         if (modal) {
             modal.classList.remove('show');
-            setTimeout(() => modal.remove(), 300);
         }
     },
     
@@ -3450,7 +3449,7 @@ const app = {
             </div>
         `;
         
-        modal.style.display = 'flex';
+        modal.classList.add('show');
         
         // Setup drag and drop
         setTimeout(() => {
