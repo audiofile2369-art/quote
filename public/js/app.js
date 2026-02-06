@@ -466,6 +466,11 @@ const app = {
             return;
         }
         
+        // Ensure items array exists
+        if (!this.data.items) {
+            this.data.items = [];
+        }
+        
         // Check if this package already exists in the job
         const existingPackages = [...new Set(this.data.items.map(i => i.category))];
         if (existingPackages.includes(packageName)) {
@@ -481,6 +486,7 @@ const app = {
                 category: packageName,
                 description: cb.dataset.desc,
                 qty: parseFloat(cb.dataset.qty) || 1,
+                cost: parseFloat(cb.dataset.cost) || 0,
                 price: parseFloat(cb.dataset.price) || 0
             });
         });
@@ -491,6 +497,7 @@ const app = {
                 category: packageName,
                 description: '',
                 qty: 1,
+                cost: 0,
                 price: 0
             });
         }
@@ -498,7 +505,9 @@ const app = {
         // Add items to job
         this.data.items.push(...selectedItems);
 
+        // Close modal first to ensure UI updates
         this.closeModal();
+        
         this.renderItems();
         this.calculateTotals();
         this.save();
