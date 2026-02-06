@@ -2,6 +2,7 @@
 const app = {
     data: {
         id: null, // Database job ID
+        stationName: '',
         clientName: '',
         siteAddress: '',
         quoteDate: '',
@@ -2738,6 +2739,7 @@ const app = {
 
     async save() {
         // Collect all form data
+        this.data.stationName = document.getElementById('stationName')?.value || '';
         this.data.clientName = document.getElementById('clientName')?.value || '';
         this.data.siteAddress = document.getElementById('siteAddress')?.value || '';
         this.data.quoteDate = document.getElementById('quoteDate')?.value || '';
@@ -2968,6 +2970,7 @@ const app = {
     },
 
     populateForm() {
+        document.getElementById('stationName').value = this.data.stationName || '';
         document.getElementById('clientName').value = this.data.clientName || '';
         document.getElementById('siteAddress').value = this.data.siteAddress || '';
         document.getElementById('quoteDate').value = this.data.quoteDate || '';
@@ -3483,7 +3486,7 @@ const app = {
         // Build content array
         const content = [
             { text: 'PROJECT ESTIMATE', style: 'title', alignment: 'center' },
-            { text: this.data.siteAddress || this.data.clientName || '[Project Site]', style: 'siteName', alignment: 'center' },
+            { text: this.data.stationName || this.data.siteAddress || this.data.clientName || '[Project Site]', style: 'siteName', alignment: 'center' },
             { text: this.data.companyName || 'Your Company', style: 'company', alignment: 'center' },
             { text: `${this.data.phone} | ${this.data.email}`, style: 'contact', alignment: 'center' },
             { text: '\n' },

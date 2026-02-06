@@ -164,6 +164,16 @@ async function initDB() {
                 END IF;
             END $$;
         `);
+        
+        // Add station_name column if it doesn't exist
+        await client.query(`
+            DO $$
+            BEGIN
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='jobs' AND column_name='station_name') THEN
+                    ALTER TABLE jobs ADD COLUMN station_name VARCHAR(255);
+                END IF;
+            END $$;
+        `);
 
         // Create contractor_links table for short URLs
         await client.query(`
@@ -462,14 +472,15 @@ app.post('/api/jobs', async (req, res) => {
 
         const jobResult = await client.query(`
             INSERT INTO jobs (
-                client_name, site_address, quote_date, quote_number,
+                station_name, client_name, site_address, quote_date, quote_number,
                 company_name, contact_name, phone, email,
                 project_notes, tax_rate, discount, payment_terms,
                 scope_of_work, disclaimers, files, section_scopes, section_disclaimers, contractor_section_disclaimers, section_upcharges, contractor_assignments,
                 todos, section_todos, meetings, section_meetings, critical_junctures, testing_calibration, testing_assignments, testing_schedules
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28)
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29)
             RETURNING id
         `, [
+            req.body.stationName,
             req.body.clientName,
             req.body.siteAddress,
             req.body.quoteDate || null,
@@ -572,14 +583,15 @@ app.put('/api/jobs/:id', async (req, res) => {
 
         await client.query(`
             UPDATE jobs SET
-                client_name = $1, site_address = $2, quote_date = $3, quote_number = $4,
-                company_name = $5, contact_name = $6, phone = $7, email = $8,
-                project_notes = $9, tax_rate = $10, discount = $11, payment_terms = $12,
-                scope_of_work = $13, disclaimers = $14, files = $15,
-                section_scopes = $16, section_disclaimers = $17, contractor_section_disclaimers = $18, section_upcharges = $19, contractor_assignments = $20,
-                todos = $21, section_todos = $22, meetings = $23, section_meetings = $24, critical_junctures = $25, testing_calibration = $26, testing_assignments = $27, testing_schedules = $28, updated_at = NOW()
-            WHERE id = $29
+                station_name = $1, client_name = $2, site_address = $3, quote_date = $4, quote_number = $5,
+                company_name = $6, contact_name = $7, phone = $8, email = $9,
+                project_notes = $10, tax_rate = $11, discount = $12, payment_terms = $13,
+                scope_of_work = $14, disclaimers = $15, files = $16,
+                section_scopes = $17, section_disclaimers = $18, contractor_section_disclaimers = $19, section_upcharges = $20, contractor_assignments = $21,
+                todos = $22, section_todos = $23, meetings = $24, section_meetings = $25, critical_junctures = $26, testing_calibration = $27, testing_assignments = $28, testing_schedules = $29, updated_at = NOW()
+            WHERE id = $30
         `, [
+            req.body.stationName,
             req.body.clientName,
             req.body.siteAddress,
             req.body.quoteDate || null,
