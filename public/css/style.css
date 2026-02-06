@@ -539,3 +539,33 @@ td input[readonly] {
 .autocomplete-item:hover {
     background: #f8f9fa;
 }
+
+/* PDF Customization Modal */
+.pdf-category-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    margin-bottom: 8px;
+    cursor: move;
+    transition: all 0.2s;
+}
+
+.pdf-category-item:hover {
+    background: #f8f9fa;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.drag-handle {
+    font-size: 18px;
+    color: #6c757d;
+    cursor: grab;
+    user-select: none;
+}
+
+.pdf-category-item:active {
+    cursor: grabbing;
+}

@@ -3407,6 +3407,102 @@ const app = {
 
     generatePDF() {
         this.save();
+        
+        // Get unique categories from items
+        const uniqueCategories = [...new Set(this.data.items.map(item => item.category))].filter(Boolean);
+        
+        // Show customization modal
+        this.showPDFCustomizationModal(uniqueCategories);
+    },
+
+    showPDFCustomizationModal(categories) {
+        const modal = document.getElementById('modal');
+        const modalContent = document.getElementById('modalContent');
+        
+        // Build draggable category list
+        let categoryListHTML = categories.map((cat, idx) => `
+            <div class="pdf-category-item" draggable="true" data-category="${cat}" data-index="${idx}">
+                <span class="drag-handle">⋮⋮</span>
+                <span>${cat}</span>
+            </div>
+        `).join('');
+        
+        modalContent.innerHTML = `
+            <h3 style="margin-top: 0;">Customize PDF</h3>
+            
+            <div style="margin-bottom: 20px;">
+                <label style="display: block; font-weight: 600; margin-bottom: 8px;">
+                    Equipment Package Order
+                    <span style="font-weight: normal; color: #666; font-size: 13px;">(Drag to reorder)</span>
+                </label>
+                <div id="categoryOrderList" style="background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 6px; padding: 10px;">
+                    ${categoryListHTML}
+                </div>
+            </div>
+            
+            <div style="margin-bottom: 20px; padding: 12px; background: #e7f3ff; border: 1px solid #b3d9ff; border-radius: 6px;">
+                <strong>📋 Note:</strong> Package scopes and disclaimers will appear immediately after each package's line items.
+            </div>
+            
+            <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                <button onclick="app.closeModal()" class="btn" style="background: #6c757d;">Cancel</button>
+                <button onclick="app.generatePDFWithOrder()" class="btn" style="background: #28a745;">Generate PDF</button>
+            </div>
+        `;
+        
+        modal.style.display = 'flex';
+        
+        // Setup drag and drop
+        setTimeout(() => {
+            const list = document.getElementById('categoryOrderList');
+            const items = list.querySelectorAll('.pdf-category-item');
+            
+            let draggedItem = null;
+            
+            items.forEach(item => {
+                item.addEventListener('dragstart', (e) => {
+                    draggedItem = item;
+                    item.style.opacity = '0.5';
+                });
+                
+                item.addEventListener('dragend', (e) => {
+                    item.style.opacity = '1';
+                });
+                
+                item.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                });
+                
+                item.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    if (draggedItem !== item) {
+                        const allItems = [...list.querySelectorAll('.pdf-category-item')];
+                        const draggedIndex = allItems.indexOf(draggedItem);
+                        const targetIndex = allItems.indexOf(item);
+                        
+                        if (draggedIndex < targetIndex) {
+                            item.parentNode.insertBefore(draggedItem, item.nextSibling);
+                        } else {
+                            item.parentNode.insertBefore(draggedItem, item);
+                        }
+                    }
+                });
+            });
+        }, 100);
+    },
+
+    generatePDFWithOrder() {
+        // Get ordered categories from the modal
+        const items = document.querySelectorAll('.pdf-category-item');
+        const orderedCategories = Array.from(items).map(item => item.dataset.category);
+        
+        this.closeModal();
+        
+        // Generate PDF with custom order
+        this.generatePDFActual(orderedCategories);
+    },
+
+    generatePDFActual(orderedCategories) {
 
         // Calculate category totals for breakdown
         const categoryTotals = {};
@@ -3420,77 +3516,14 @@ const app = {
         const taxAmount = subtotal * (this.data.taxRate / 100);
         const grandTotal = subtotal + taxAmount - this.data.discount;
 
-        // Build line items table with categories and section totals
-        const tableBody = [
-            [
-                { text: 'Description', style: 'tableHeader' },
-                { text: 'QTY', style: 'tableHeader', alignment: 'center' },
-                { text: 'Unit Price', style: 'tableHeader', alignment: 'right' },
-                { text: 'Total', style: 'tableHeader', alignment: 'right' }
-            ]
-        ];
-
-        let currentCategory = '';
-        const categories = [];
-
-        // Sort items by category to keep packages together
-        const sortedItems = [...this.data.items].sort((a, b) => {
-            const catA = a.category || 'Uncategorized';
-            const catB = b.category || 'Uncategorized';
-            return catA.localeCompare(catB);
-        });
-
-        sortedItems.forEach((item, idx) => {
-            // If category changed, add section total for previous category
-            if (item.category && item.category !== currentCategory) {
-                // Add section total for previous category
-                if (currentCategory && categoryTotals[currentCategory]) {
-                    tableBody.push([
-                        { text: `${currentCategory} Total:`, colSpan: 3, bold: true, alignment: 'right', fillColor: '#f8f9fa' },
-                        {},
-                        {},
-                        { text: '$' + this.formatCurrency(categoryTotals[currentCategory]), bold: true, alignment: 'right', fillColor: '#f8f9fa' }
-                    ]);
-                }
-
-                currentCategory = item.category;
-                // Only add to categories array if not already present
-                if (!categories.includes(currentCategory)) {
-                    categories.push(currentCategory); // Track for scopes later
-                }
-                tableBody.push([
-                    { text: currentCategory, colSpan: 4, bold: true, color: '#c41e3a', fillColor: '#e8e8e8', margin: [0, 8, 0, 5] },
-                    {},
-                    {},
-                    {}
-                ]);
-            }
-
-            const total = (item.qty || 0) * (item.price || 0);
-            tableBody.push([
-                item.description || '',
-                { text: (item.qty || 0).toString(), alignment: 'center' },
-                { text: '$' + this.formatCurrency(item.price || 0), alignment: 'right' },
-                { text: '$' + this.formatCurrency(total), alignment: 'right' }
-            ]);
-        });
-
-        // Add final section total
-        if (currentCategory && categoryTotals[currentCategory]) {
-            tableBody.push([
-                { text: `${currentCategory} Total:`, colSpan: 3, bold: true, alignment: 'right', fillColor: '#f8f9fa' },
-                {},
-                {},
-                { text: '$' + this.formatCurrency(categoryTotals[currentCategory]), bold: true, alignment: 'right', fillColor: '#f8f9fa' }
-            ]);
-        }
-
-        // Build price breakdown by section
+        // Build price breakdown by section (using ordered categories)
         const breakdownBody = [
             [{ text: 'Equipment Package', style: 'tableHeader' }, { text: 'Amount', style: 'tableHeader', alignment: 'right' }]
         ];
-        Object.entries(categoryTotals).sort((a, b) => b[1] - a[1]).forEach(([cat, total]) => {
-            breakdownBody.push([cat, { text: '$' + this.formatCurrency(total), alignment: 'right' }]);
+        orderedCategories.forEach(cat => {
+            if (categoryTotals[cat]) {
+                breakdownBody.push([cat, { text: '$' + this.formatCurrency(categoryTotals[cat]), alignment: 'right' }]);
+            }
         });
 
         // Build content array
@@ -3518,32 +3551,92 @@ const app = {
             },
             { text: '\n' },
 
-            { text: 'DETAILED LINE ITEMS', style: 'sectionHeader' },
-            {
+            { text: 'DETAILED LINE ITEMS', style: 'sectionHeader' }
+        ];
+
+        // For each category in order, add line items + scope + disclaimers
+        orderedCategories.forEach((category, catIndex) => {
+            const categoryItems = this.data.items.filter(item => item.category === category);
+            
+            if (categoryItems.length === 0) return;
+
+            // Build table for this category
+            const tableBody = [
+                [
+                    { text: 'Description', style: 'tableHeader' },
+                    { text: 'QTY', style: 'tableHeader', alignment: 'center' },
+                    { text: 'Unit Price', style: 'tableHeader', alignment: 'right' },
+                    { text: 'Total', style: 'tableHeader', alignment: 'right' }
+                ]
+            ];
+
+            // Add category header
+            tableBody.push([
+                { text: category, colSpan: 4, bold: true, color: '#c41e3a', fillColor: '#e8e8e8', margin: [0, 8, 0, 5] },
+                {},
+                {},
+                {}
+            ]);
+
+            // Add items
+            categoryItems.forEach(item => {
+                const total = (item.qty || 0) * (item.price || 0);
+                tableBody.push([
+                    item.description || '',
+                    { text: (item.qty || 0).toString(), alignment: 'center' },
+                    { text: '$' + this.formatCurrency(item.price || 0), alignment: 'right' },
+                    { text: '$' + this.formatCurrency(total), alignment: 'right' }
+                ]);
+            });
+
+            // Add category total
+            tableBody.push([
+                { text: `${category} Total:`, colSpan: 3, bold: true, alignment: 'right', fillColor: '#f8f9fa' },
+                {},
+                {},
+                { text: '$' + this.formatCurrency(categoryTotals[category]), bold: true, alignment: 'right', fillColor: '#f8f9fa' }
+            ]);
+
+            // Add the table to content
+            content.push({
                 table: {
                     widths: ['*', 50, 80, 80],
                     body: tableBody
                 },
-                layout: 'lightHorizontalLines'
-            },
-            { text: '\n' },
+                layout: 'lightHorizontalLines',
+                pageBreak: catIndex === 0 ? undefined : 'before' // Page break before each package except first
+            });
 
-            {
-                table: {
-                    widths: ['*', 120],
-                    body: [
-                        ['Subtotal:', { text: '$' + this.formatCurrency(subtotal), alignment: 'right' }],
-                        [`Tax (${this.data.taxRate}%):`, { text: '$' + this.formatCurrency(taxAmount), alignment: 'right' }],
-                        ['Discount:', { text: '-$' + this.formatCurrency(this.data.discount), alignment: 'right' }],
-                        [
-                            { text: 'TOTAL:', bold: true, fontSize: 12 },
-                            { text: '$' + this.formatCurrency(grandTotal), bold: true, alignment: 'right', fontSize: 14 }
-                        ]
-                    ]
-                },
-                layout: 'noBorders'
+            // Add scope of work for this package if present
+            if (this.data.sectionScopes && this.data.sectionScopes[category]) {
+                content.push({ text: `\n${category} - Scope of Work`, bold: true, fontSize: 11, color: '#c41e3a', margin: [0, 8, 0, 4] });
+                content.push({ text: this.data.sectionScopes[category], fontSize: 10, margin: [0, 0, 0, 8] });
             }
-        ];
+
+            // Add disclaimers for this package if present
+            if (this.data.sectionDisclaimers && this.data.sectionDisclaimers[category]) {
+                content.push({ text: `\n${category} - Disclaimers`, bold: true, fontSize: 11, color: '#c41e3a', margin: [0, 8, 0, 4] });
+                content.push({ text: this.data.sectionDisclaimers[category], fontSize: 10, margin: [0, 0, 0, 12] });
+            }
+        });
+
+        // Add totals
+        content.push({ text: '\n' });
+        content.push({
+            table: {
+                widths: ['*', 120],
+                body: [
+                    ['Subtotal:', { text: '$' + this.formatCurrency(subtotal), alignment: 'right' }],
+                    [`Tax (${this.data.taxRate}%):`, { text: '$' + this.formatCurrency(taxAmount), alignment: 'right' }],
+                    ['Discount:', { text: '-$' + this.formatCurrency(this.data.discount), alignment: 'right' }],
+                    [
+                        { text: 'TOTAL:', bold: true, fontSize: 12 },
+                        { text: '$' + this.formatCurrency(grandTotal), bold: true, alignment: 'right', fontSize: 14 }
+                    ]
+                ]
+            },
+            layout: 'noBorders'
+        });
 
         // Add general scope of work if present
         if (this.data.scopeOfWork) {
@@ -3551,34 +3644,10 @@ const app = {
             content.push({ text: this.data.scopeOfWork, fontSize: 10 });
         }
 
-        // Add package-specific scopes of work if present
-        const hasPackageScopes = categories.some(cat => this.data.sectionScopes && this.data.sectionScopes[cat]);
-        if (hasPackageScopes) {
-            content.push({ text: '\nEQUIPMENT PACKAGE SCOPES OF WORK', style: 'sectionHeader' });
-            categories.forEach(cat => {
-                if (this.data.sectionScopes && this.data.sectionScopes[cat]) {
-                    content.push({ text: cat, bold: true, fontSize: 11, color: '#c41e3a', margin: [0, 8, 0, 4] });
-                    content.push({ text: this.data.sectionScopes[cat], fontSize: 10, margin: [0, 0, 0, 8] });
-                }
-            });
-        }
-
         // Add general disclaimers if present
         if (this.data.disclaimers) {
             content.push({ text: '\nGENERAL DISCLAIMERS', style: 'sectionHeader' });
             content.push({ text: this.data.disclaimers, fontSize: 10 });
-        }
-
-        // Add package-specific disclaimers if present
-        const hasPackageDisclaimers = categories.some(cat => this.data.sectionDisclaimers && this.data.sectionDisclaimers[cat]);
-        if (hasPackageDisclaimers) {
-            content.push({ text: '\nEQUIPMENT PACKAGE DISCLAIMERS', style: 'sectionHeader' });
-            categories.forEach(cat => {
-                if (this.data.sectionDisclaimers && this.data.sectionDisclaimers[cat]) {
-                    content.push({ text: cat, bold: true, fontSize: 11, color: '#c41e3a', margin: [0, 8, 0, 4] });
-                    content.push({ text: this.data.sectionDisclaimers[cat], fontSize: 10, margin: [0, 0, 0, 8] });
-                }
-            });
         }
 
         // Add payment terms if present
