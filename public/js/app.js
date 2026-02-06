@@ -28,6 +28,7 @@ const app = {
         sectionTodos: {}, // { 'package': [{ id, text, priority, deadline, completed, completedAt }] }
         contractorAssignments: {}, // { 'contractorName': ['Package A', 'Package B'] }
         contractorLogos: {}, // { 'contractorName': 'logoUrl or base64' }
+        packageOrder: [], // ['Package A', 'Package B', ...] - custom order for PDF
         meetings: [], // [{ id, title, datetime, location, notes, createdAt }]
         sectionMeetings: {}, // { 'package': [meeting objects] }
         criticalJunctures: [], // [{ id, date, description, assignedPerson, createdAt }]
@@ -2914,6 +2915,7 @@ const app = {
             this.data.sectionTodos = job.section_todos || {};
             this.data.contractorAssignments = job.contractor_assignments || {};
             this.data.contractorLogos = job.contractor_logos || {};
+            this.data.packageOrder = job.package_order || [];
             this.data.meetings = job.meetings || [];
             this.data.sectionMeetings = job.section_meetings || {};
             this.data.criticalJunctures = job.critical_junctures || [];
@@ -3138,26 +3140,38 @@ const app = {
     async editContractorAssignment(category) {
         const currentContractor = this.getContractorForCategory(category);
         
+        // Get list of all unique contractors
+        const existingContractors = Object.keys(this.data.contractorLogos || {}).sort();
+        
         const modal = document.getElementById('modal');
         const modalContent = document.getElementById('modalContent');
+        
+        // Build contractor options dropdown
+        const contractorOptions = existingContractors.map(name => 
+            `<option value="${name}">${name}</option>`
+        ).join('');
         
         modalContent.innerHTML = `
             <h3 style="margin-top: 0;">Assign Contractor: ${category}</h3>
             
             <div class="form-group" style="margin-bottom: 20px;">
                 <label>Contractor Name</label>
-                <input type="text" id="contractorNameInput" value="${currentContractor || ''}" placeholder="Enter contractor name" style="width: 100%; padding: 10px; border: 1px solid #dee2e6; border-radius: 6px;">
+                <input list="contractorsList" type="text" id="contractorNameInput" value="${currentContractor || ''}" placeholder="Select existing or type new contractor name" style="width: 100%; padding: 10px; border: 1px solid #dee2e6; border-radius: 6px;">
+                <datalist id="contractorsList">
+                    ${contractorOptions}
+                </datalist>
+                <small style="color: #666;">Select from previous contractors or type a new name.</small>
             </div>
             
             <div class="form-group" style="margin-bottom: 20px;">
                 <label>Contractor Logo (Optional)</label>
                 <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 10px;">
-                    <input type="text" id="contractorLogoInput" value="${this.data.contractorLogos && currentContractor ? (this.data.contractorLogos[currentContractor] || '') : ''}" placeholder="URL or base64" style="flex: 1; padding: 10px; border: 1px solid #dee2e6; border-radius: 6px;">
+                    <input type="text" id="contractorLogoInput" value="${this.data.contractorLogos && currentContractor ? (this.data.contractorLogos[currentContractor] || '') : ''}" placeholder="URL or base64" style="flex: 1; padding: 10px; border: 1px solid #dee2e6; border-radius: 6px;" readonly>
                     <button onclick="document.getElementById('contractorLogoUpload').click()" class="btn" style="background: #3b82f6; padding: 10px 20px;">📁 Upload</button>
                     <input type="file" id="contractorLogoUpload" accept="image/*" style="display: none;">
                 </div>
                 <div id="contractorLogoPreviewModal" style="margin-top: 10px;"></div>
-                <small style="color: #666;">Logo will appear in PDF on this contractor's packages.</small>
+                <small style="color: #666;">Logo is saved per contractor and will be reused automatically.</small>
             </div>
             
             <div style="display: flex; gap: 10px; justify-content: flex-end;">
@@ -3168,11 +3182,30 @@ const app = {
         
         modal.classList.add('show');
         
-        // Setup logo upload handler
+        // Setup handlers
         setTimeout(() => {
+            const nameInput = document.getElementById('contractorNameInput');
             const logoInput = document.getElementById('contractorLogoInput');
             const logoUpload = document.getElementById('contractorLogoUpload');
             const logoPreview = document.getElementById('contractorLogoPreviewModal');
+            
+            // When contractor name changes, load their logo if exists
+            nameInput.addEventListener('input', () => {
+                const selectedName = nameInput.value.trim();
+                if (selectedName && this.data.contractorLogos && this.data.contractorLogos[selectedName]) {
+                    const savedLogo = this.data.contractorLogos[selectedName];
+                    logoInput.value = savedLogo;
+                    logoPreview.innerHTML = `
+                        <div style="border: 1px solid #dee2e6; border-radius: 6px; padding: 10px; display: inline-block; background: #f8f9fa;">
+                            <img src="${savedLogo}" style="max-width: 200px; max-height: 100px; display: block;" alt="Contractor logo">
+                            <p style="margin: 8px 0 0 0; font-size: 12px; color: #28a745;">✓ Saved logo loaded</p>
+                        </div>
+                    `;
+                } else {
+                    logoInput.value = '';
+                    logoPreview.innerHTML = '';
+                }
+            });
             
             // Show existing logo if any
             if (logoInput.value) {
@@ -3236,12 +3269,16 @@ const app = {
             }
             this.data.contractorAssignments[newName].push(category);
             
-            // Save logo if provided
+            // Always save/update logo for this contractor (even if empty, to maintain the contractor in the list)
+            if (!this.data.contractorLogos) {
+                this.data.contractorLogos = {};
+            }
+            // Only update logo if one was provided, otherwise keep existing
             if (logoUrl) {
-                if (!this.data.contractorLogos) {
-                    this.data.contractorLogos = {};
-                }
                 this.data.contractorLogos[newName] = logoUrl;
+            } else if (!this.data.contractorLogos[newName]) {
+                // New contractor with no logo - add to list with empty string
+                this.data.contractorLogos[newName] = '';
             }
         }
 
@@ -3511,8 +3548,18 @@ const app = {
         const modal = document.getElementById('modal');
         const modalContent = document.getElementById('modalContent');
         
+        // Use saved package order if available, otherwise use current category order
+        let orderedCategories = categories;
+        if (this.data.packageOrder && this.data.packageOrder.length > 0) {
+            // Filter saved order to only include categories that still exist
+            const savedOrder = this.data.packageOrder.filter(cat => categories.includes(cat));
+            // Add any new categories that weren't in saved order
+            const newCategories = categories.filter(cat => !savedOrder.includes(cat));
+            orderedCategories = [...savedOrder, ...newCategories];
+        }
+        
         // Build draggable category list
-        let categoryListHTML = categories.map((cat, idx) => `
+        let categoryListHTML = orderedCategories.map((cat, idx) => `
             <div class="pdf-category-item" draggable="true" data-category="${cat}" data-index="${idx}">
                 <span class="drag-handle">⋮⋮</span>
                 <span>${cat}</span>
@@ -3533,7 +3580,7 @@ const app = {
             </div>
             
             <div style="margin-bottom: 20px; padding: 12px; background: #e7f3ff; border: 1px solid #b3d9ff; border-radius: 6px;">
-                <strong>📋 Note:</strong> Package scopes and disclaimers will appear immediately after each package's line items.
+                <strong>📋 Note:</strong> Package scopes and disclaimers will appear immediately after each package's line items. Your order will be saved.
             </div>
             
             <div style="display: flex; gap: 10px; justify-content: flex-end;">
@@ -3587,6 +3634,10 @@ const app = {
         // Get ordered categories from the modal
         const items = document.querySelectorAll('.pdf-category-item');
         const orderedCategories = Array.from(items).map(item => item.dataset.category);
+        
+        // Save the order for future use
+        this.data.packageOrder = orderedCategories;
+        this.save();
         
         this.closeModal();
         
