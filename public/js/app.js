@@ -3428,7 +3428,7 @@ const app = {
         ];
 
         let currentCategory = '';
-        let categoryItems = [];
+        const categories = [];
 
         this.data.items.forEach((item, idx) => {
             // If category changed, add section total for previous category
@@ -3444,6 +3444,7 @@ const app = {
                 }
 
                 currentCategory = item.category;
+                categories.push(currentCategory); // Track for scopes later
                 tableBody.push([
                     { text: currentCategory, colSpan: 4, bold: true, color: '#c41e3a', fillColor: '#e8e8e8', margin: [0, 8, 0, 5] },
                     {},
@@ -3479,79 +3480,119 @@ const app = {
             breakdownBody.push([cat, { text: '$' + this.formatCurrency(total), alignment: 'right' }]);
         });
 
+        // Build content array
+        const content = [
+            { text: 'PROJECT ESTIMATE', style: 'title', alignment: 'center' },
+            { text: this.data.siteAddress || this.data.clientName || '[Project Site]', style: 'siteName', alignment: 'center' },
+            { text: this.data.companyName || 'Your Company', style: 'company', alignment: 'center' },
+            { text: `${this.data.phone} | ${this.data.email}`, style: 'contact', alignment: 'center' },
+            { text: '\n' },
+
+            { text: 'Prepared For:', style: 'sectionHeader' },
+            { text: this.data.clientName || '[Client Name]', bold: true },
+            { text: this.data.siteAddress || '[Site Address]' },
+            { text: `Date: ${this.data.quoteDate || new Date().toISOString().split('T')[0]}` },
+            { text: `Estimate #: ${this.data.quoteNumber || 'N/A'}` },
+            { text: '\n' },
+
+            { text: 'PRICE BREAKDOWN BY PACKAGE', style: 'sectionHeader' },
+            {
+                table: {
+                    widths: ['*', 100],
+                    body: breakdownBody
+                },
+                layout: 'lightHorizontalLines'
+            },
+            { text: '\n' },
+
+            { text: 'DETAILED LINE ITEMS', style: 'sectionHeader' },
+            {
+                table: {
+                    widths: ['*', 50, 80, 80],
+                    body: tableBody
+                },
+                layout: 'lightHorizontalLines'
+            },
+            { text: '\n' },
+
+            {
+                table: {
+                    widths: ['*', 120],
+                    body: [
+                        ['Subtotal:', { text: '$' + this.formatCurrency(subtotal), alignment: 'right' }],
+                        [`Tax (${this.data.taxRate}%):`, { text: '$' + this.formatCurrency(taxAmount), alignment: 'right' }],
+                        ['Discount:', { text: '-$' + this.formatCurrency(this.data.discount), alignment: 'right' }],
+                        [
+                            { text: 'TOTAL:', bold: true, fontSize: 12 },
+                            { text: '$' + this.formatCurrency(grandTotal), bold: true, alignment: 'right', fontSize: 14 }
+                        ]
+                    ]
+                },
+                layout: 'noBorders'
+            }
+        ];
+
+        // Add general scope of work if present
+        if (this.data.scopeOfWork) {
+            content.push({ text: '\nGENERAL SCOPE OF WORK', style: 'sectionHeader' });
+            content.push({ text: this.data.scopeOfWork, fontSize: 10 });
+        }
+
+        // Add package-specific scopes of work if present
+        const hasPackageScopes = categories.some(cat => this.data.sectionScopes && this.data.sectionScopes[cat]);
+        if (hasPackageScopes) {
+            content.push({ text: '\nEQUIPMENT PACKAGE SCOPES OF WORK', style: 'sectionHeader' });
+            categories.forEach(cat => {
+                if (this.data.sectionScopes && this.data.sectionScopes[cat]) {
+                    content.push({ text: cat, bold: true, fontSize: 11, color: '#c41e3a', margin: [0, 8, 0, 4] });
+                    content.push({ text: this.data.sectionScopes[cat], fontSize: 10, margin: [0, 0, 0, 8] });
+                }
+            });
+        }
+
+        // Add general disclaimers if present
+        if (this.data.disclaimers) {
+            content.push({ text: '\nGENERAL DISCLAIMERS', style: 'sectionHeader' });
+            content.push({ text: this.data.disclaimers, fontSize: 10 });
+        }
+
+        // Add package-specific disclaimers if present
+        const hasPackageDisclaimers = categories.some(cat => this.data.sectionDisclaimers && this.data.sectionDisclaimers[cat]);
+        if (hasPackageDisclaimers) {
+            content.push({ text: '\nEQUIPMENT PACKAGE DISCLAIMERS', style: 'sectionHeader' });
+            categories.forEach(cat => {
+                if (this.data.sectionDisclaimers && this.data.sectionDisclaimers[cat]) {
+                    content.push({ text: cat, bold: true, fontSize: 11, color: '#c41e3a', margin: [0, 8, 0, 4] });
+                    content.push({ text: this.data.sectionDisclaimers[cat], fontSize: 10, margin: [0, 0, 0, 8] });
+                }
+            });
+        }
+
+        // Add payment terms if present
+        if (this.data.paymentTerms) {
+            content.push({ text: '\nPAYMENT TERMS', style: 'sectionHeader' });
+            content.push({ text: this.data.paymentTerms, fontSize: 10 });
+        }
+
         const docDefinition = {
             pageSize: 'LETTER',
             pageMargins: [40, 60, 40, 60],
-
-            content: [
-                { text: 'QUOTE', style: 'title', alignment: 'center' },
-                { text: this.data.companyName || 'Your Company', style: 'company', alignment: 'center' },
-                { text: `${this.data.phone} | ${this.data.email}`, style: 'contact', alignment: 'center' },
-                { text: '\n' },
-
-                { text: 'Prepared For:', style: 'sectionHeader' },
-                { text: this.data.clientName || '[Client Name]', bold: true },
-                { text: this.data.siteAddress || '[Site Address]' },
-                { text: `Date: ${this.data.quoteDate || new Date().toISOString().split('T')[0]}` },
-                { text: `Quote #: ${this.data.quoteNumber || 'N/A'}` },
-                { text: '\n' },
-
-                { text: 'PRICE BREAKDOWN BY PACKAGE', style: 'sectionHeader' },
-                {
-                    table: {
-                        widths: ['*', 100],
-                        body: breakdownBody
-                    },
-                    layout: 'lightHorizontalLines'
-                },
-                { text: '\n' },
-
-                { text: 'DETAILED LINE ITEMS', style: 'sectionHeader' },
-                {
-                    table: {
-                        widths: ['*', 50, 80, 80],
-                        body: tableBody
-                    },
-                    layout: 'lightHorizontalLines'
-                },
-                { text: '\n' },
-
-                {
-                    table: {
-                        widths: ['*', 120],
-                        body: [
-                            ['Subtotal:', { text: '$' + this.formatCurrency(subtotal), alignment: 'right' }],
-                            [`Tax (${this.data.taxRate}%):`, { text: '$' + this.formatCurrency(taxAmount), alignment: 'right' }],
-                            ['Discount:', { text: '-$' + this.formatCurrency(this.data.discount), alignment: 'right' }],
-                            [
-                                { text: 'TOTAL:', bold: true, fontSize: 12 },
-                                { text: '$' + this.formatCurrency(grandTotal), bold: true, alignment: 'right', fontSize: 14 }
-                            ]
-                        ]
-                    },
-                    layout: 'noBorders'
-                },
-
-                this.data.paymentTerms ? [
-                    { text: '\nPAYMENT TERMS', style: 'sectionHeader' },
-                    { text: this.data.paymentTerms, fontSize: 10 }
-                ] : [],
-
-                this.data.scopeOfWork ? [
-                    { text: '\nSCOPE OF WORK', style: 'sectionHeader' },
-                    { text: this.data.scopeOfWork, fontSize: 10 }
-                ] : []
-            ],
-
+            content: content,
             styles: {
                 title: {
                     fontSize: 24,
                     bold: true,
                     color: '#c41e3a',
+                    margin: [0, 0, 0, 5]
+                },
+                siteName: {
+                    fontSize: 18,
+                    bold: true,
+                    color: '#333',
                     margin: [0, 0, 0, 10]
                 },
                 company: {
-                    fontSize: 16,
+                    fontSize: 14,
                     bold: true,
                     margin: [0, 5, 0, 5]
                 },
@@ -3577,7 +3618,9 @@ const app = {
             }
         };
 
-        pdfMake.createPdf(docDefinition).download(`quote-${this.data.clientName || 'estimate'}.pdf`);
+        const siteName = this.data.siteAddress || this.data.clientName || 'estimate';
+        const cleanSiteName = siteName.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 50);
+        pdfMake.createPdf(docDefinition).download(`estimate-${cleanSiteName}.pdf`);
         this.showNotification('✓ PDF generated!');
     },
 
