@@ -3134,14 +3134,86 @@ const app = {
     // Edit contractor assignment for a category
     async editContractorAssignment(category) {
         const currentContractor = this.getContractorForCategory(category);
-        const newName = prompt(
-            `Enter contractor name for "${category}":`,
-            currentContractor || ''
-        );
+        
+        const modal = document.getElementById('modal');
+        const modalContent = document.getElementById('modalContent');
+        
+        modalContent.innerHTML = `
+            <h3 style="margin-top: 0;">Assign Contractor: ${category}</h3>
+            
+            <div class="form-group" style="margin-bottom: 20px;">
+                <label>Contractor Name</label>
+                <input type="text" id="contractorNameInput" value="${currentContractor || ''}" placeholder="Enter contractor name" style="width: 100%; padding: 10px; border: 1px solid #dee2e6; border-radius: 6px;">
+            </div>
+            
+            <div class="form-group" style="margin-bottom: 20px;">
+                <label>Contractor Logo (Optional)</label>
+                <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 10px;">
+                    <input type="text" id="contractorLogoInput" value="${this.data.contractorLogos && currentContractor ? (this.data.contractorLogos[currentContractor] || '') : ''}" placeholder="URL or base64" style="flex: 1; padding: 10px; border: 1px solid #dee2e6; border-radius: 6px;">
+                    <button onclick="document.getElementById('contractorLogoUpload').click()" class="btn" style="background: #3b82f6; padding: 10px 20px;">📁 Upload</button>
+                    <input type="file" id="contractorLogoUpload" accept="image/*" style="display: none;">
+                </div>
+                <div id="contractorLogoPreviewModal" style="margin-top: 10px;"></div>
+                <small style="color: #666;">Logo will appear in PDF on this contractor's packages.</small>
+            </div>
+            
+            <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                <button onclick="app.closeModal()" class="btn" style="background: #6c757d;">Cancel</button>
+                <button onclick="app.saveContractorAssignment('${category}')" class="btn" style="background: #28a745;">Save</button>
+            </div>
+        `;
+        
+        modal.classList.add('show');
+        
+        // Setup logo upload handler
+        setTimeout(() => {
+            const logoInput = document.getElementById('contractorLogoInput');
+            const logoUpload = document.getElementById('contractorLogoUpload');
+            const logoPreview = document.getElementById('contractorLogoPreviewModal');
+            
+            // Show existing logo if any
+            if (logoInput.value) {
+                logoPreview.innerHTML = `
+                    <div style="border: 1px solid #dee2e6; border-radius: 6px; padding: 10px; display: inline-block; background: #f8f9fa;">
+                        <img src="${logoInput.value}" style="max-width: 200px; max-height: 100px; display: block;" alt="Contractor logo">
+                    </div>
+                `;
+            }
+            
+            logoUpload.onchange = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                
+                if (!file.type.startsWith('image/')) {
+                    this.showNotification('⚠️ Please select an image file', 3000);
+                    return;
+                }
+                
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    const base64 = event.target.result;
+                    logoInput.value = base64;
+                    logoPreview.innerHTML = `
+                        <div style="border: 1px solid #dee2e6; border-radius: 6px; padding: 10px; display: inline-block; background: #f8f9fa;">
+                            <img src="${base64}" style="max-width: 200px; max-height: 100px; display: block;" alt="Contractor logo">
+                        </div>
+                    `;
+                };
+                reader.readAsDataURL(file);
+            };
+        }, 100);
+    },
 
-        if (newName === null) return; // Cancelled
-
-        const cleanName = newName.trim();
+    async saveContractorAssignment(category) {
+        const contractorNameInput = document.getElementById('contractorNameInput');
+        const contractorLogoInput = document.getElementById('contractorLogoInput');
+        
+        if (!contractorNameInput || !contractorLogoInput) return;
+        
+        const newName = contractorNameInput.value.trim();
+        const logoUrl = contractorLogoInput.value.trim();
+        
+        const currentContractor = this.getContractorForCategory(category);
 
         // Remove this category from any existing contractor assignment
         for (const [contractor, categories] of Object.entries(this.data.contractorAssignments || {})) {
@@ -3155,17 +3227,26 @@ const app = {
         }
 
         // Assign to new contractor (if name provided)
-        if (cleanName) {
-            if (!this.data.contractorAssignments[cleanName]) {
-                this.data.contractorAssignments[cleanName] = [];
+        if (newName) {
+            if (!this.data.contractorAssignments[newName]) {
+                this.data.contractorAssignments[newName] = [];
             }
-            this.data.contractorAssignments[cleanName].push(category);
+            this.data.contractorAssignments[newName].push(category);
+            
+            // Save logo if provided
+            if (logoUrl) {
+                if (!this.data.contractorLogos) {
+                    this.data.contractorLogos = {};
+                }
+                this.data.contractorLogos[newName] = logoUrl;
+            }
         }
 
+        this.closeModal();
         this.save();
         await this.saveToDatabase(false);
         this.renderItems();
-        this.showNotification(cleanName ? `✓ ${category} assigned to ${cleanName}` : `✓ Contractor removed from ${category}`);
+        this.showNotification(newName ? `✓ ${category} assigned to ${newName}` : `✓ Contractor removed from ${category}`);
     },
 
     async sendSectionToContractor(category) {
@@ -3537,7 +3618,20 @@ const app = {
         // Build content array
         const content = [
             { text: 'PROJECT ESTIMATE', style: 'title', alignment: 'center' },
-            { text: this.data.stationName || this.data.siteAddress || this.data.clientName || '[Project Site]', style: 'siteName', alignment: 'center' },
+            { text: this.data.stationName || this.data.siteAddress || this.data.clientName || '[Project Site]', style: 'siteName', alignment: 'center' }
+        ];
+        
+        // Add company logo if available
+        if (this.data.companyLogoUrl) {
+            content.push({
+                image: this.data.companyLogoUrl,
+                width: 150,
+                alignment: 'center',
+                margin: [0, 10, 0, 10]
+            });
+        }
+        
+        content.push(
             { text: this.data.companyName || 'Your Company', style: 'company', alignment: 'center' },
             { text: `${this.data.phone} | ${this.data.email}`, style: 'contact', alignment: 'center' },
             { text: '\n' },
@@ -3560,13 +3654,17 @@ const app = {
             { text: '\n' },
 
             { text: 'DETAILED LINE ITEMS', style: 'sectionHeader' }
-        ];
+        );
 
         // For each category in order, add line items + scope + disclaimers
         orderedCategories.forEach((category, catIndex) => {
             const categoryItems = this.data.items.filter(item => item.category === category);
             
             if (categoryItems.length === 0) return;
+            
+            // Check if this package has an assigned contractor with logo
+            const assignedContractor = this.getContractorForCategory(category);
+            const contractorLogo = assignedContractor && this.data.contractorLogos ? this.data.contractorLogos[assignedContractor] : null;
 
             // Build table for this category
             const tableBody = [
@@ -3614,6 +3712,19 @@ const app = {
                 layout: 'lightHorizontalLines',
                 pageBreak: catIndex === 0 ? undefined : 'before' // Page break before each package except first
             });
+            
+            // Add contractor logo if assigned
+            if (contractorLogo) {
+                content.push({
+                    columns: [
+                        { text: `Contractor: ${assignedContractor}`, bold: true, fontSize: 10, color: '#666', margin: [0, 8, 0, 0] },
+                        { image: contractorLogo, width: 80, alignment: 'right', margin: [0, 4, 0, 0] }
+                    ],
+                    columnGap: 10
+                });
+            } else if (assignedContractor) {
+                content.push({ text: `Contractor: ${assignedContractor}`, bold: true, fontSize: 10, color: '#666', margin: [0, 8, 0, 4] });
+            }
 
             // Add scope of work for this package if present
             if (this.data.sectionScopes && this.data.sectionScopes[category]) {
