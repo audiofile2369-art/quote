@@ -507,7 +507,7 @@ app.post('/api/jobs', async (req, res) => {
                 project_notes, tax_rate, discount, payment_terms,
                 scope_of_work, disclaimers, files, section_scopes, section_disclaimers, contractor_section_disclaimers, section_upcharges, contractor_assignments, contractor_logos, package_order,
                 todos, section_todos, meetings, section_meetings, critical_junctures, testing_calibration, testing_assignments, testing_schedules
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33)
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32)
             RETURNING id
         `, [
             req.body.stationName,
