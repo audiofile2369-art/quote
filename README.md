@@ -1,6 +1,6 @@
-# Gas Station Estimator
+# Gas Station Project Manager
 
-**A comprehensive web-based estimator for gas station construction projects**
+**A comprehensive web-based project manager for gas station construction projects**
 
 Featuring equipment package management, PDF estimate generation, contractor collaboration, logo management, and comprehensive project tracking - specifically designed for Dallas, Texas gas station construction projects.
 

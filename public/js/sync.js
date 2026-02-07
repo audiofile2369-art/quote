@@ -26,13 +26,13 @@ const TabSync = {
 
         // Try BroadcastChannel first (modern browsers)
         if (typeof BroadcastChannel !== 'undefined') {
-            this.channel = new BroadcastChannel(`estimator-job-${jobId}`);
+            this.channel = new BroadcastChannel(`project-manager-job-${jobId}`);
             this.channel.onmessage = (event) => this.handleMessage(event.data);
             console.log('[TabSync] Initialized with BroadcastChannel for job:', jobId);
         } else {
             // Fallback to localStorage events for older browsers
             window.addEventListener('storage', (event) => {
-                if (event.key === `estimator-sync-${jobId}` && event.newValue) {
+                if (event.key === `project-manager-sync-${jobId}` && event.newValue) {
                     try {
                         const data = JSON.parse(event.newValue);
                         this.handleMessage(data);
@@ -64,9 +64,9 @@ const TabSync = {
             this.channel.postMessage(message);
         } else {
             // localStorage fallback - will trigger storage event in other tabs
-            localStorage.setItem(`estimator-sync-${this.jobId}`, JSON.stringify(message));
+            localStorage.setItem(`project-manager-sync-${this.jobId}`, JSON.stringify(message));
             // Clear it immediately to allow future updates with same data
-            setTimeout(() => localStorage.removeItem(`estimator-sync-${this.jobId}`), 100);
+            setTimeout(() => localStorage.removeItem(`project-manager-sync-${this.jobId}`), 100);
         }
 
         console.log('[TabSync] Broadcasted:', type);

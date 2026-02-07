@@ -1798,7 +1798,7 @@ const app = {
         const icsContent = [
             'BEGIN:VCALENDAR',
             'VERSION:2.0',
-            'PRODID:-//FuelServicePro//Project Estimator//EN',
+            'PRODID:-//FuelServicePro//Project Manager//EN',
             'BEGIN:VEVENT',
             `UID:${meeting.id}@fuelservicepro.com`,
             `DTSTAMP:${formatDateForICS(new Date())}`,
@@ -2771,7 +2771,7 @@ const app = {
         try {
             const backupData = { ...this.data };
             delete backupData.files; // Don't save files to localStorage - too large
-            localStorage.setItem('estimatorData', JSON.stringify(backupData));
+            localStorage.setItem('projectManagerData', JSON.stringify(backupData));
         } catch (e) {
             console.warn('Failed to save to localStorage:', e);
         }
@@ -2950,7 +2950,7 @@ const app = {
     },
 
     loadFromStorage() {
-        const saved = localStorage.getItem('estimatorData');
+        const saved = localStorage.getItem('projectManagerData');
         if (saved) {
             try {
                 const loadedData = JSON.parse(saved);

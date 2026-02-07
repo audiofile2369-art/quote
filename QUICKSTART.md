@@ -1,4 +1,4 @@
-# Quick Start Guide - Gas Station Estimator
+# Quick Start Guide - Gas Station Project Manager
 
 **Last Updated**: February 7, 2026
 
@@ -6,7 +6,7 @@
 
 ## 🎯 What This Is
 
-A comprehensive web-based estimator for **gas station construction projects** that includes:
+A comprehensive web-based project manager for **gas station construction projects** that includes:
 
 - ✅ **12 Pre-Built Equipment Packages** with detailed line items
 - ✅ **Professional PDF Generation** with company/contractor logos

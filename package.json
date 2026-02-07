@@ -1,7 +1,7 @@
 {
-  "name": "estimator",
+  "name": "project-manager",
   "version": "1.0.0",
-  "description": "Project estimator with contractor collaboration",
+  "description": "Project manager with contractor collaboration",
   "main": "server.js",
   "type": "module",
   "scripts": {
@@ -9,7 +9,7 @@
     "dev": "node server.js",
     "build": "echo 'No build needed - static site'"
   },
-  "keywords": ["estimator", "quote", "bid"],
+  "keywords": ["project-manager", "quote", "bid"],
   "author": "",
   "license": "ISC",
   "dependencies": {
