@@ -3377,42 +3377,38 @@ const app = {
         const currentScope = this.data.sectionScopes[category] || '';
         const readonly = this.data.mode === 'contractor' && !this.data.contractorSections.includes(category);
         
-        // Create modal
-        const modal = document.createElement('div');
-        modal.className = 'modal';
-        modal.innerHTML = `
-            <div class="modal-content">
-                <h3>Scope of Work - ${category}</h3>
-                <textarea id="sectionScopeText" rows="10" style="width: 100%; padding: 10px; font-size: 14px;" ${readonly ? 'readonly' : ''}>${currentScope}</textarea>
-                <div style="margin-top: 15px; text-align: right;">
-                    ${!readonly ? '<button class="btn" onclick="app.saveSectionScope(\'' + category + '\')">Save</button>' : ''}
-                    <button class="btn" onclick="app.closeModal()">Close</button>
-                </div>
+        // Use the existing modal element
+        const modal = document.getElementById('modal');
+        const modalContent = document.getElementById('modalContent');
+        
+        modalContent.innerHTML = `
+            <h3>Scope of Work - ${category}</h3>
+            <textarea id="sectionScopeText" rows="10" style="width: 100%; padding: 10px; font-size: 14px;" ${readonly ? 'readonly' : ''}>${currentScope}</textarea>
+            <div style="margin-top: 15px; text-align: right;">
+                ${!readonly ? '<button class="btn" onclick="app.saveSectionScope(\'' + category + '\')">Save</button>' : ''}
+                <button class="btn" onclick="app.closeModal()">Close</button>
             </div>
         `;
-        document.body.appendChild(modal);
-        setTimeout(() => modal.classList.add('show'), 10);
+        modal.classList.add('show');
     },
     
     editSectionDisclaimers(category) {
         const currentDisclaimers = this.data.sectionDisclaimers[category] || '';
         const readonly = this.data.mode === 'contractor' && !this.data.contractorSections.includes(category);
         
-        // Create modal
-        const modal = document.createElement('div');
-        modal.className = 'modal';
-        modal.innerHTML = `
-            <div class="modal-content">
-                <h3>Disclaimers - ${category}</h3>
-                <textarea id="sectionDisclaimersText" rows="10" style="width: 100%; padding: 10px; font-size: 14px;" ${readonly ? 'readonly' : ''}>${currentDisclaimers}</textarea>
-                <div style="margin-top: 15px; text-align: right;">
-                    ${!readonly ? '<button class="btn" onclick="app.saveSectionDisclaimers(\'' + category + '\')">Save</button>' : ''}
-                    <button class="btn" onclick="app.closeModal()">Close</button>
-                </div>
+        // Use the existing modal element
+        const modal = document.getElementById('modal');
+        const modalContent = document.getElementById('modalContent');
+        
+        modalContent.innerHTML = `
+            <h3>Disclaimers - ${category}</h3>
+            <textarea id="sectionDisclaimersText" rows="10" style="width: 100%; padding: 10px; font-size: 14px;" ${readonly ? 'readonly' : ''}>${currentDisclaimers}</textarea>
+            <div style="margin-top: 15px; text-align: right;">
+                ${!readonly ? '<button class="btn" onclick="app.saveSectionDisclaimers(\'' + category + '\')">Save</button>' : ''}
+                <button class="btn" onclick="app.closeModal()">Close</button>
             </div>
         `;
-        document.body.appendChild(modal);
-        setTimeout(() => modal.classList.add('show'), 10);
+        modal.classList.add('show');
     },
     
     async saveSectionScope(category) {
@@ -3447,22 +3443,20 @@ const app = {
     viewSectionDisclaimers(category) {
         const ownerDisclaimers = this.data.sectionDisclaimers[category] || '';
 
-        const modal = document.createElement('div');
-        modal.className = 'modal';
-        modal.innerHTML = `
-            <div class="modal-content">
-                <h3>⚠️ Disclaimers - ${category}</h3>
-                <p style="color: #666; margin-bottom: 10px; font-size: 14px;">Project Manager's Disclaimers (Read Only)</p>
-                <div style="background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 6px; padding: 15px; min-height: 150px; white-space: pre-wrap; line-height: 1.6; color: #333;">
-                    ${ownerDisclaimers || '<em style="color: #999;">No disclaimers added by project manager.</em>'}
-                </div>
-                <div style="margin-top: 15px; text-align: right;">
-                    <button class="btn" onclick="app.closeModal()">Close</button>
-                </div>
+        const modal = document.getElementById('modal');
+        const modalContent = document.getElementById('modalContent');
+        
+        modalContent.innerHTML = `
+            <h3>⚠️ Disclaimers - ${category}</h3>
+            <p style="color: #666; margin-bottom: 10px; font-size: 14px;">Project Manager's Disclaimers (Read Only)</p>
+            <div style="background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 6px; padding: 15px; min-height: 150px; white-space: pre-wrap; line-height: 1.6; color: #333;">
+                ${ownerDisclaimers || '<em style="color: #999;">No disclaimers added by project manager.</em>'}
+            </div>
+            <div style="margin-top: 15px; text-align: right;">
+                <button class="btn" onclick="app.closeModal()">Close</button>
             </div>
         `;
-        document.body.appendChild(modal);
-        setTimeout(() => modal.classList.add('show'), 10);
+        modal.classList.add('show');
     },
 
     // Contractor adds/edits their own disclaimers for a section
@@ -3477,21 +3471,19 @@ const app = {
         const contractorName = this.data.contractorName || 'Contractor';
         const currentText = this.data.contractorSectionDisclaimers[category][contractorName] || '';
 
-        const modal = document.createElement('div');
-        modal.className = 'modal';
-        modal.innerHTML = `
-            <div class="modal-content">
-                <h3>📝 My Disclaimers - ${category}</h3>
-                <p style="color: #666; margin-bottom: 10px; font-size: 14px;">Add your disclaimers for this equipment package (${contractorName})</p>
-                <textarea id="contractorDisclaimersText" rows="10" style="width: 100%; padding: 10px; font-size: 14px;" placeholder="Enter your disclaimers, exclusions, or notes...">${currentText}</textarea>
-                <div style="margin-top: 15px; text-align: right;">
-                    <button class="btn" style="background: #28a745; margin-right: 10px;" onclick="app.saveContractorDisclaimers('${category}')">Save</button>
-                    <button class="btn" onclick="app.closeModal()">Cancel</button>
-                </div>
+        const modal = document.getElementById('modal');
+        const modalContent = document.getElementById('modalContent');
+        
+        modalContent.innerHTML = `
+            <h3>📝 My Disclaimers - ${category}</h3>
+            <p style="color: #666; margin-bottom: 10px; font-size: 14px;">Add your disclaimers for this equipment package (${contractorName})</p>
+            <textarea id="contractorDisclaimersText" rows="10" style="width: 100%; padding: 10px; font-size: 14px;" placeholder="Enter your disclaimers, exclusions, or notes...">${currentText}</textarea>
+            <div style="margin-top: 15px; text-align: right;">
+                <button class="btn" style="background: #28a745; margin-right: 10px;" onclick="app.saveContractorDisclaimers('${category}')">Save</button>
+                <button class="btn" onclick="app.closeModal()">Cancel</button>
             </div>
         `;
-        document.body.appendChild(modal);
-        setTimeout(() => modal.classList.add('show'), 10);
+        modal.classList.add('show');
     },
 
     async saveContractorDisclaimers(category) {
