@@ -2225,10 +2225,6 @@ const app = {
         }
     },
 
-    // Update upcharge percentage for a category and recalculate all prices
-    async updateSectionUpcharge(category, percent) {
-        percent = parseFloat(percent) || 0;
-
     // Toggle contractor pricing visibility
     toggleContractorPricing() {
         this.data.showContractorPricing = !this.data.showContractorPricing;
@@ -2582,17 +2578,6 @@ const app = {
             const isContractorMode = this.data.mode === 'contractor';
             const isContractorSection = isContractorMode && this.data.contractorSections.includes(category);
             const showContractorCols = !isContractorMode && this.data.showContractorPricing;
-            
-            // Get contractor name for this category
-            let assignedContractor = null;
-            if (this.data.contractorAssignments) {
-                for (const [contractor, packages] of Object.entries(this.data.contractorAssignments)) {
-                    if (packages.includes(category)) {
-                        assignedContractor = contractor;
-                        break;
-                    }
-                }
-            }
             
             if (isContractorMode && isContractorSection) {
                 // CONTRACTOR MODE: Show List Price (read-only) and Your Price (editable)
