@@ -2279,6 +2279,7 @@ const app = {
                     <span style="font-weight:600; color:#495057;">Select All Packages</span>
                 </label>
                 <div style="flex:1"></div>
+                <button class="btn-add-section" style="background:#6c757d; margin-right:10px;" onclick="app.showReorderPackagesModal()">↕️ Reorder</button>
                 <button class="btn-add-section" style="background:#28a745; margin-right:10px;" onclick="app.showAddPackageModal()">➕ Add Equipment Package</button>
                 <button class="btn-add-section" style="background:#007bff;" onclick="app.sendSelectedSectionsToContractor()">📤 Send Selected to Contractor</button>`;
             container.appendChild(selectAllBar);
@@ -3516,6 +3517,118 @@ const app = {
         if (modal) {
             modal.classList.remove('show');
         }
+    },
+    
+    showReorderPackagesModal() {
+        const modal = document.getElementById('modal');
+        const modalContent = document.getElementById('modalContent');
+        
+        // Get unique categories in current order
+        const categories = [];
+        this.data.items.forEach(item => {
+            const cat = item.category || 'Uncategorized';
+            if (!categories.includes(cat)) {
+                categories.push(cat);
+            }
+        });
+        
+        // Build draggable category list
+        let categoryListHTML = categories.map((cat, idx) => `
+            <div class="reorder-package-item" draggable="true" data-category="${cat}" data-index="${idx}" style="display:flex; align-items:center; gap:10px; padding:12px 15px; background:#fff; border:1px solid #dee2e6; border-radius:6px; margin-bottom:8px; cursor:grab;">
+                <span class="drag-handle" style="color:#adb5bd; font-size:18px;">⋮⋮</span>
+                <span style="flex:1; font-weight:500;">${cat}</span>
+                <span style="color:#6c757d; font-size:13px;">${this.data.items.filter(i => i.category === cat).length} items</span>
+            </div>
+        `).join('');
+        
+        modalContent.innerHTML = `
+            <h3 style="margin-top: 0; color: #333;">↕️ Reorder Equipment Packages</h3>
+            
+            <div style="margin-bottom: 15px; color: #666; font-size: 14px;">
+                Drag and drop to reorder packages. This order will be used on the page and saved for PDF generation.
+            </div>
+            
+            <div id="reorderPackageList" style="background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; padding: 12px; max-height: 400px; overflow-y: auto;">
+                ${categoryListHTML}
+            </div>
+            
+            <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
+                <button onclick="app.closeModal()" class="btn" style="background: #6c757d;">Cancel</button>
+                <button onclick="app.applyPackageReorder()" class="btn" style="background: #28a745;">Apply Order</button>
+            </div>
+        `;
+        
+        modal.classList.add('show');
+        
+        // Setup drag and drop
+        setTimeout(() => {
+            const list = document.getElementById('reorderPackageList');
+            const items = list.querySelectorAll('.reorder-package-item');
+            
+            let draggedItem = null;
+            
+            items.forEach(item => {
+                item.addEventListener('dragstart', (e) => {
+                    draggedItem = item;
+                    item.style.opacity = '0.5';
+                    item.style.cursor = 'grabbing';
+                });
+                
+                item.addEventListener('dragend', (e) => {
+                    item.style.opacity = '1';
+                    item.style.cursor = 'grab';
+                });
+                
+                item.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    item.style.borderTop = '2px solid #3b82f6';
+                });
+                
+                item.addEventListener('dragleave', (e) => {
+                    item.style.borderTop = '1px solid #dee2e6';
+                });
+                
+                item.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    item.style.borderTop = '1px solid #dee2e6';
+                    if (draggedItem !== item) {
+                        const allItems = [...list.querySelectorAll('.reorder-package-item')];
+                        const draggedIndex = allItems.indexOf(draggedItem);
+                        const targetIndex = allItems.indexOf(item);
+                        
+                        if (draggedIndex < targetIndex) {
+                            item.parentNode.insertBefore(draggedItem, item.nextSibling);
+                        } else {
+                            item.parentNode.insertBefore(draggedItem, item);
+                        }
+                    }
+                });
+            });
+        }, 100);
+    },
+    
+    applyPackageReorder() {
+        // Get new order from modal
+        const items = document.querySelectorAll('.reorder-package-item');
+        const newOrder = Array.from(items).map(item => item.dataset.category);
+        
+        // Reorder this.data.items based on new category order
+        const reorderedItems = [];
+        newOrder.forEach(category => {
+            const categoryItems = this.data.items.filter(item => item.category === category);
+            reorderedItems.push(...categoryItems);
+        });
+        
+        this.data.items = reorderedItems;
+        
+        // Also save as package order for PDF
+        this.data.packageOrder = newOrder;
+        
+        this.closeModal();
+        this.renderItems();
+        this.calculateTotals();
+        this.save();
+        this.showNotification('✓ Package order updated');
     },
     
     deleteSection(category) {
