@@ -271,8 +271,8 @@ const app = {
             const sectionsCount = this.data.contractorSections.length;
             
             banner.innerHTML = `
-                <strong>👷 ${contractorNameDisplay}:</strong> You can fill in pricing for ${sectionsCount} section${sectionsCount !== 1 ? 's' : ''}. 
-                When done, click "Send Back to Owner" button below.
+                <strong>👷 ${contractorNameDisplay}:</strong> Fill in your pricing for ${sectionsCount} equipment package${sectionsCount !== 1 ? 's' : ''}. 
+                When done, scroll to the bottom and click <strong>"Save & Send to Owner"</strong>.
             `;
             
             const tabsElement = document.querySelector('.tabs');
@@ -294,23 +294,7 @@ const app = {
                 }
             });
             
-            // Add "Send Back to Owner" button after the tabs (no actions div in HTML)
-            const sendBackBtn = document.createElement('div');
-            sendBackBtn.style.cssText = 'text-align: center; padding: 20px; background: #f8f9fa; border-bottom: 2px solid #dee2e6;';
-            sendBackBtn.innerHTML = `
-                <button onclick="app.sendBackToOwner()" class="btn btn-danger" style="font-size: 18px; padding: 18px 40px; background: #28a745; border: none; border-radius: 6px; cursor: pointer; color: white; font-weight: 600;">
-                    ✅ SEND BACK TO OWNER
-                </button>
-                <div style="margin-top: 10px; color: #155724; font-weight: 600;">💾 Your changes are auto-saved as you type</div>
-            `;
-            
-            if (tabsElement && containerElement) {
-                tabsElement.parentNode.insertBefore(sendBackBtn, tabsElement.nextSibling);
-            }
-            
-            // Show auto-save indicator
-
-            
+            // No longer adding button here - it's at the bottom of the Line Items page
 
         }
     },
@@ -2225,36 +2209,43 @@ const app = {
         }
     },
 
-    // Toggle contractor pricing visibility
-    toggleContractorPricing() {
-        this.data.showContractorPricing = !this.data.showContractorPricing;
-        this.save();
-        this.renderItems();
-    },
-
-    // Update contractor's own pricing for an item
-    async updateContractorPricing(index, field, value) {
-        const contractorName = this.data.contractorName;
-        if (!contractorName) return;
+    // Update contractor's own pricing for an item - stores directly on line item
+    updateContractorPricing(index, value) {
+        if (this.data.mode !== 'contractor') return;
         
         value = parseFloat(value) || 0;
         
-        if (!this.data.contractorPricing) {
-            this.data.contractorPricing = {};
+        // Store directly on the line item
+        if (this.data.items[index]) {
+            this.data.items[index].contractorPrice = value;
+            // Mark as having unsaved contractor changes
+            this.hasUnsavedContractorChanges = true;
+            
+            // Update the total display for this item
+            const qty = this.data.items[index].qty || 0;
+            const totalEl = document.querySelector(`.contractor-total-${index}`);
+            if (totalEl) {
+                totalEl.textContent = '$' + this.formatCurrency(qty * value);
+            }
         }
-        if (!this.data.contractorPricing[contractorName]) {
-            this.data.contractorPricing[contractorName] = {};
-        }
-        if (!this.data.contractorPricing[contractorName][index]) {
-            this.data.contractorPricing[contractorName][index] = { cost: 0, price: 0 };
-        }
+    },
+
+    // Save all contractor pricing and send back to owner
+    async saveContractorPricing() {
+        if (this.data.mode !== 'contractor') return;
         
-        this.data.contractorPricing[contractorName][index][field] = value;
-        
+        // Save to localStorage first
         this.save();
-        await this.saveToDatabase(true);
-        this.renderItems();
-        this.showNotification('✓ Your pricing saved');
+        
+        // Save to database
+        const success = await this.saveToDatabase(true);
+        
+        if (success) {
+            this.hasUnsavedContractorChanges = false;
+            this.showNotification('✅ Your pricing has been saved! The project owner will see your updates.', 5000);
+        } else {
+            alert('Failed to save pricing. Please try again.');
+        }
     },
 
     // Add a new line item by contractor
@@ -2434,22 +2425,12 @@ const app = {
             const selectAllBar = document.createElement('div');
             selectAllBar.style.cssText = 'display:flex; align-items:center; gap:10px; padding:10px; background:#f8f9fa; border:1px solid #dee2e6; border-radius:6px; margin-bottom:10px; flex-wrap: wrap;';
             
-            // Check if any contractor pricing exists
-            const hasContractorPricing = Object.keys(this.data.contractorPricing || {}).length > 0 || 
-                                         Object.keys(this.data.contractorLineItems || {}).length > 0;
-            
             selectAllBar.innerHTML = `
                 <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
                     <input type="checkbox" id="selectAllSections" style="width:18px; height:18px;"> 
                     <span style="font-weight:600; color:#495057;">Select All Packages</span>
                 </label>
                 <div style="flex:1"></div>
-                ${hasContractorPricing ? `
-                <label style="display:flex; align-items:center; gap:8px; cursor:pointer; background: #e0f2fe; padding: 6px 12px; border-radius: 6px; border: 1px solid #0ea5e9;">
-                    <input type="checkbox" id="toggleContractorPricing" ${this.data.showContractorPricing ? 'checked' : ''} onchange="app.toggleContractorPricing()" style="width:16px; height:16px;"> 
-                    <span style="font-weight:500; color:#0369a1; font-size: 13px;">👷 Show Contractor Pricing</span>
-                </label>
-                ` : ''}
                 <button class="btn-add-section" style="background:#6c757d; margin-right:10px;" onclick="app.showReorderPackagesModal()">↕️ Reorder</button>
                 <button class="btn-add-section" style="background:#28a745; margin-right:10px;" onclick="app.showAddPackageModal()">➕ Add Equipment Package</button>
                 <button class="btn-add-section" style="background:#007bff;" onclick="app.sendSelectedSectionsToContractor()">📤 Send Selected to Contractor</button>`;
@@ -2577,36 +2558,35 @@ const app = {
             // Determine if we should show contractor pricing columns
             const isContractorMode = this.data.mode === 'contractor';
             const isContractorSection = isContractorMode && this.data.contractorSections.includes(category);
-            const showContractorCols = !isContractorMode && this.data.showContractorPricing;
+            // Show contractor column if there's an assigned contractor (no toggle needed)
+            const showContractorCol = !isContractorMode && assignedContractor;
             
             if (isContractorMode && isContractorSection) {
                 // CONTRACTOR MODE: Show List Price (read-only) and Your Price (editable)
                 table.innerHTML = `
                     <thead>
                         <tr>
-                            <th style="width: 35%;">Description</th>
+                            <th style="width: 40%;">Description</th>
                             <th style="width: 70px;">QTY</th>
                             <th style="width: 100px;">List Price</th>
-                            <th style="width: 100px; background: #dbeafe;">Your Cost</th>
-                            <th style="width: 100px; background: #dbeafe;">Your Price</th>
+                            <th style="width: 120px; background: #dbeafe;">Your Price</th>
                             <th style="width: 100px; background: #dbeafe;">Your Total</th>
                             <th style="width: 50px;"></th>
                         </tr>
                     </thead>
                     <tbody></tbody>
                 `;
-            } else if (showContractorCols && assignedContractor) {
-                // OWNER MODE WITH CONTRACTOR PRICING: Show both owner and contractor columns
+            } else if (showContractorCol) {
+                // OWNER MODE WITH ASSIGNED CONTRACTOR: Show contractor price column
                 table.innerHTML = `
                     <thead>
                         <tr>
-                            <th style="width: 25%;">Description</th>
+                            <th style="width: 30%;">Description</th>
                             <th style="width: 60px;">QTY</th>
                             <th style="width: 80px;">Cost</th>
                             <th style="width: 80px;">Unit Price</th>
                             <th style="width: 80px;">Total</th>
-                            <th style="width: 80px; background: #dbeafe;">👷 Cost</th>
-                            <th style="width: 80px; background: #dbeafe;">👷 Price</th>
+                            <th style="width: 100px; background: #dbeafe;">👷 Price</th>
                             <th style="width: 80px; background: #dbeafe;">👷 Total</th>
                             <th style="width: 50px;"></th>
                         </tr>
@@ -2631,7 +2611,6 @@ const app = {
             }
 
             const tbody = table.querySelector('tbody');
-            const contractorName = this.data.contractorName;
 
             categories[category].forEach(({ item, index }) => {
                 const row = document.createElement('tr');
@@ -2640,12 +2619,9 @@ const app = {
                 const total = (item.qty || 0) * price;
                 const escapedDesc = (item.description || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 
-                // Get contractor pricing for this item
-                const contractorPricingData = this.data.contractorPricing?.[contractorName]?.[index] || 
-                                              this.data.contractorPricing?.[assignedContractor]?.[index] || {};
-                const cCost = contractorPricingData.cost || 0;
-                const cPrice = contractorPricingData.price || 0;
-                const cTotal = (item.qty || 0) * cPrice;
+                // Get contractor pricing directly from item
+                const contractorPrice = item.contractorPrice || 0;
+                const contractorTotal = (item.qty || 0) * contractorPrice;
 
                 const canEdit = (this.data.mode !== 'contractor' || isContractorSection);
                 const removeBtn = canEdit && this.data.mode !== 'contractor' ? `<button class="btn-remove" onclick="app.removeItem(${index})">×</button>` : '';
@@ -2657,9 +2633,8 @@ const app = {
                 const formattedCost = this.formatCurrency(cost);
                 const formattedPrice = this.formatCurrency(price);
                 const formattedTotal = this.formatCurrency(total);
-                const formattedCCost = this.formatCurrency(cCost);
-                const formattedCPrice = this.formatCurrency(cPrice);
-                const formattedCTotal = this.formatCurrency(cTotal);
+                const formattedContractorPrice = this.formatCurrency(contractorPrice);
+                const formattedContractorTotal = this.formatCurrency(contractorTotal);
 
                 if (isContractorMode && isContractorSection) {
                     // CONTRACTOR VIEW: Description read-only, List price read-only, own pricing editable
@@ -2668,26 +2643,22 @@ const app = {
                         <td style="text-align: center;">${item.qty || 0}</td>
                         <td style="text-align: right; color: #6b7280;">$${formattedPrice}</td>
                         <td style="background: #eff6ff;">
-                            <input type="text" value="${cCost ? '$' + formattedCCost : ''}" 
+                            <input type="text" value="${contractorPrice ? '$' + formattedContractorPrice : ''}"
                                 placeholder="$0.00"
+                                data-index="${index}"
+                                class="contractor-price-input"
                                 onfocus="this.value = app.parseCurrency(this.value) || ''"
-                                onblur="this.value = this.value ? app.formatCurrency(this.value) : ''; app.updateContractorPricing(${index}, 'cost', app.parseCurrency(this.value))"
+                                onblur="this.value = this.value ? '$' + app.formatCurrency(this.value) : ''"
+                                oninput="app.updateContractorPricing(${index}, app.parseCurrency(this.value))"
                                 style="width: 100%; text-align: right; border: 1px solid #93c5fd; border-radius: 4px; padding: 4px 8px; background: white;">
                         </td>
-                        <td style="background: #eff6ff;">
-                            <input type="text" value="${cPrice ? '$' + formattedCPrice : ''}"
-                                placeholder="$0.00"
-                                onfocus="this.value = app.parseCurrency(this.value) || ''"
-                                onblur="this.value = this.value ? app.formatCurrency(this.value) : ''; app.updateContractorPricing(${index}, 'price', app.parseCurrency(this.value))"
-                                style="width: 100%; text-align: right; border: 1px solid #93c5fd; border-radius: 4px; padding: 4px 8px; background: white;">
-                        </td>
-                        <td style="text-align: right; font-weight: 600; background: #eff6ff; color: #1d4ed8;">$${formattedCTotal}</td>
+                        <td style="text-align: right; font-weight: 600; background: #eff6ff; color: #1d4ed8;" class="contractor-total-${index}">$${formattedContractorTotal}</td>
                         <td></td>
                     `;
-                } else if (showContractorCols && assignedContractor) {
-                    // OWNER VIEW WITH CONTRACTOR PRICING
+                } else if (showContractorCol) {
+                    // OWNER VIEW WITH ASSIGNED CONTRACTOR - Show contractor price column
                     if (isEditing && canEdit) {
-                        // Edit mode with contractor columns
+                        // Edit mode with contractor column
                         const descInputId = `desc-input-${index}`;
                         row.innerHTML = `
                             <td style="position: relative;">
@@ -2709,25 +2680,23 @@ const app = {
                                 onblur="this.value = app.formatCurrency(this.value); app.updateItem(${index}, 'price', app.parseCurrency(this.value))"
                                 style="text-align: right; width: 70px;"></td>
                             <td><input type="text" value="$${formattedTotal}" readonly style="text-align: right; width: 70px;"></td>
-                            <td style="text-align: right; background: #eff6ff; color: #1d4ed8;">$${formattedCCost}</td>
-                            <td style="text-align: right; background: #eff6ff; color: #1d4ed8;">$${formattedCPrice}</td>
-                            <td style="text-align: right; background: #eff6ff; color: #1d4ed8; font-weight: 600;">$${formattedCTotal}</td>
+                            <td style="text-align: right; background: #eff6ff; color: #1d4ed8;">${contractorPrice ? '$' + formattedContractorPrice : '—'}</td>
+                            <td style="text-align: right; background: #eff6ff; color: #1d4ed8; font-weight: 600;">${contractorPrice ? '$' + formattedContractorTotal : '—'}</td>
                             <td style="white-space: nowrap;">
                                 <button onclick="app.saveItemEdit(${index})" style="background: #22c55e; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 14px; margin-right: 4px;" title="Save">✓</button>
                                 ${removeBtn}
                             </td>
                         `;
                     } else {
-                        // View mode with contractor columns
+                        // View mode with contractor column
                         row.innerHTML = `
                             <td style="white-space: pre-wrap; word-wrap: break-word; padding: 10px;">${item.description || ''}</td>
                             <td style="text-align: center;">${item.qty || 0}</td>
                             <td style="text-align: right; color: #6b7280;">$${formattedCost}</td>
                             <td style="text-align: right;">$${formattedPrice}</td>
                             <td style="text-align: right; font-weight: 600;">$${formattedTotal}</td>
-                            <td style="text-align: right; background: #eff6ff; color: #1d4ed8;">$${formattedCCost}</td>
-                            <td style="text-align: right; background: #eff6ff; color: #1d4ed8;">$${formattedCPrice}</td>
-                            <td style="text-align: right; background: #eff6ff; color: #1d4ed8; font-weight: 600;">$${formattedCTotal}</td>
+                            <td style="text-align: right; background: #eff6ff; color: #1d4ed8;">${contractorPrice ? '$' + formattedContractorPrice : '—'}</td>
+                            <td style="text-align: right; background: #eff6ff; color: #1d4ed8; font-weight: 600;">${contractorPrice ? '$' + formattedContractorTotal : '—'}</td>
                             <td style="white-space: nowrap;">
                                 ${canEdit ? `<button onclick="app.editItemRow(${index})" style="background: #3b82f6; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 14px; margin-right: 4px;" title="Edit">✏️</button>` : ''}
                                 ${removeBtn}
@@ -2781,6 +2750,7 @@ const app = {
             
             // Add contractor's own line items if in contractor mode
             if (isContractorMode && isContractorSection) {
+                const contractorName = this.data.contractorName;
                 const contractorItems = this.data.contractorLineItems?.[contractorName]?.[category] || [];
                 contractorItems.forEach((cItem, cIndex) => {
                     const row = document.createElement('tr');
@@ -2793,7 +2763,6 @@ const app = {
                         </td>
                         <td style="text-align: center;">${cItem.qty || 0}</td>
                         <td style="text-align: right; color: #6b7280;">—</td>
-                        <td style="text-align: right; background: #eff6ff; color: #1d4ed8;">$${this.formatCurrency(cItem.cost || 0)}</td>
                         <td style="text-align: right; background: #eff6ff; color: #1d4ed8;">$${this.formatCurrency(cItem.price || 0)}</td>
                         <td style="text-align: right; font-weight: 600; background: #eff6ff; color: #1d4ed8;">$${this.formatCurrency(cTotal)}</td>
                         <td>
@@ -2804,8 +2773,8 @@ const app = {
                 });
             }
             
-            // Show contractor line items in owner mode with contractor pricing toggle
-            if (showContractorCols && assignedContractor) {
+            // Show contractor line items in owner mode when contractor is assigned
+            if (showContractorCol) {
                 const contractorItems = this.data.contractorLineItems?.[assignedContractor]?.[category] || [];
                 contractorItems.forEach((cItem, cIndex) => {
                     const row = document.createElement('tr');
@@ -2820,7 +2789,6 @@ const app = {
                         <td style="text-align: right; color: #9ca3af;">—</td>
                         <td style="text-align: right; color: #9ca3af;">—</td>
                         <td style="text-align: right; color: #9ca3af;">—</td>
-                        <td style="text-align: right; background: #eff6ff; color: #1d4ed8;">$${this.formatCurrency(cItem.cost || 0)}</td>
                         <td style="text-align: right; background: #eff6ff; color: #1d4ed8;">$${this.formatCurrency(cItem.price || 0)}</td>
                         <td style="text-align: right; font-weight: 600; background: #eff6ff; color: #1d4ed8;">$${this.formatCurrency(cTotal)}</td>
                         <td></td>
@@ -2877,6 +2845,20 @@ const app = {
             
             container.appendChild(section);
         });
+        
+        // Add Save button at bottom for contractor mode
+        if (this.data.mode === 'contractor') {
+            const saveContainer = document.createElement('div');
+            saveContainer.style.cssText = 'text-align: center; padding: 30px; margin-top: 20px; background: linear-gradient(135deg, #f0fdf4, #dcfce7); border-radius: 12px; border: 2px solid #22c55e;';
+            saveContainer.innerHTML = `
+                <h3 style="margin: 0 0 10px 0; color: #166534;">Ready to Submit Your Pricing?</h3>
+                <p style="color: #15803d; margin-bottom: 20px;">Click the button below to save and send your pricing back to the project owner.</p>
+                <button onclick="app.saveContractorPricing()" class="btn" style="font-size: 20px; padding: 18px 50px; background: #22c55e; border: none; border-radius: 8px; cursor: pointer; color: white; font-weight: 700; box-shadow: 0 4px 6px rgba(34, 197, 94, 0.3);">
+                    💾 SAVE & SEND TO OWNER
+                </button>
+            `;
+            container.appendChild(saveContainer);
+        }
         
         // Add "Send Selected to Contractor" and "New Section" buttons (owner mode only)
         if (this.data.mode !== 'contractor') {
@@ -3277,8 +3259,6 @@ const app = {
             this.data.sectionUpcharges = job.section_upcharges || {};
             this.data.contractorPricing = job.contractor_pricing || {};
             this.data.contractorLineItems = job.contractor_line_items || {};
-            console.log('Loaded contractorPricing:', JSON.stringify(this.data.contractorPricing));
-            console.log('Loaded contractorLineItems:', JSON.stringify(this.data.contractorLineItems));
             this.data.todos = job.todos || [];
             this.data.sectionTodos = job.section_todos || {};
             this.data.contractorAssignments = job.contractor_assignments || {};
