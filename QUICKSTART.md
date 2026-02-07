@@ -1,6 +1,6 @@
 # Quick Start Guide - Gas Station Estimator
 
-**Last Updated**: February 5, 2026
+**Last Updated**: February 7, 2026
 
 ---
 
@@ -9,13 +9,15 @@
 A comprehensive web-based estimator for **gas station construction projects** that includes:
 
 - ✅ **12 Pre-Built Equipment Packages** with detailed line items
+- ✅ **Professional PDF Generation** with company/contractor logos
+- ✅ **Drag-and-Drop Package Reordering** on page and for PDF
+- ✅ **Contractor Management** - Assign, track, and share packages
+- ✅ **Save as Default** - Save current line items as template defaults
+- ✅ **Scope of Work & Disclaimers** - Per package and general
 - ✅ **150 Default Todos** specific to Dallas, Texas gas stations
 - ✅ **Cost & Price Tracking** for accurate estimates
-- ✅ **Priority-Based Workflow** (P1-P4 task priorities)
 - ✅ **Auto-Save** to PostgreSQL database
 - ✅ **Multi-Tab Sync** - Changes update across browser tabs
-- ✅ **Edit Mode** for line items with ✏️/✓ buttons
-- ✅ **Comprehensive Summary** with tax calculation
 
 ---
 
@@ -36,58 +38,73 @@ Every push to the `main` branch automatically deploys to production.
 ## 📖 How to Use
 
 ### 1. **Navigate Tabs**
-- **Info Tab**: Client information (future feature)
-- **Equipment Packages Tab**: Manage all equipment line items
-- **Todo List Tab**: Track project tasks and milestones
-- **Summary Tab**: View cost breakdown and totals
-- **Testing & Calibration**: Equipment testing records (future)
-- **Calendar**: Task scheduling (future)
+- **Project Info**: Client info, station name, company details
+- **Equipment Packages**: Manage all equipment line items
+- **Scope of Work**: General and per-package scope
+- **Disclaimers**: General and per-package disclaimers
+- **Todo List**: Track project tasks and milestones
+- **Summary**: View cost breakdown and generate PDF
 
-### 2. **Add Equipment Items**
+### 2. **Add Equipment Packages**
 
 #### Quick Method:
 1. Click "Equipment Packages" tab
-2. Click "Add Package" button
+2. Click "➕ Add Equipment Package" button
 3. Select from 12 pre-built packages
 4. Items auto-populate with default line items
 
-#### Manual Method:
-1. Click "+ Custom Item" button
-2. Select category (or create custom)
-3. Enter description (supports multiline)
-4. Enter quantity, cost, and price
-5. Auto-saves immediately
+#### Reorder Packages:
+1. Click "↕️ Reorder" button in toolbar
+2. Drag and drop packages to new order
+3. Click "Apply Order" - order saved for page and PDF
 
-### 3. **Edit Existing Items**
+### 3. **Generate PDF Estimate**
 
-1. Find the item in Equipment Packages tab
-2. Click the **✏️ Edit** button on the right
-3. Modify description, qty, cost, or price
-4. Click the **✓ Checkmark** button to save
-5. Changes sync across all open tabs
+1. Go to Summary tab
+2. Click "Generate PDF Quote" button
+3. Reorder packages if needed in popup
+4. PDF downloads with:
+   - Company logo (if uploaded)
+   - Station name and client info
+   - Price summary with grand total
+   - Each package with line items
+   - Scope of work per package
+   - Disclaimers per package
+   - Contractor logos (if assigned)
+   - Page numbers
 
-### 4. **Manage Todos**
+### 4. **Manage Contractors**
 
-#### General Todos:
-- View all 32 project-wide tasks
-- Check off completed items
-- Set priorities (P1-P4)
-- Add deadlines
-- Track completion dates
+#### Assign Contractor to Package:
+1. Go to Equipment Packages tab
+2. Click contractor dropdown on package header
+3. Select existing or type new contractor name
+4. Upload logo (saved for future use)
 
-#### Package-Specific Todos:
-- View tasks organized by equipment package
-- 118 pre-built todos across 8 packages
-- Add custom todos per package
-- Monitor progress per section
+#### Send Package to Contractor:
+1. Select packages with checkboxes
+2. Click "📤 Send Selected to Contractor"
+3. Share generated link
 
-### 5. **View Summary**
+### 5. **Save as Default**
 
-1. Click "Summary" tab
-2. See breakdown by equipment package
-3. Review subtotals and grand total
-4. Tax calculated automatically (8.25% Dallas)
-5. Print or export report (future feature)
+Save current package line items as the default template:
+1. Edit line items in a package (qty, cost, price)
+2. Click "Save as Default" button in package header
+3. Future packages will use these defaults
+4. Button shows "Default" when items match saved defaults
+
+### 6. **Upload Logos**
+
+#### Company Logo:
+1. Go to Project Info tab
+2. Click "Upload Logo" in Company section
+3. Logo appears on PDF estimates
+
+#### Contractor Logo:
+1. Assign contractor to package
+2. Upload logo for that contractor
+3. Logo saved and reused automatically
 
 ---
 
@@ -113,13 +130,13 @@ npm start
 # Navigate to http://localhost:3000
 ```
 
-### Database Setup
+### Database Tables
 
-The application uses PostgreSQL with these tables:
-- `jobs` - Project/job records
-- `job_items` - Equipment line items
+- `jobs` - Project/job records with all metadata
+- `job_items` - Equipment line items per job
 - `package_templates` - Equipment package templates
-- `line_item_templates` - Line item templates
+- `line_item_templates` - Line item templates with defaults
+- `contractor_links` - Short URLs for contractor sharing
 
 Tables auto-initialize on first run.
 
@@ -138,34 +155,15 @@ Tables auto-initialize on first run.
 1. **Tank and Excavation** - Complete excavation, tank supply, structural work
 2. **Forecourt Island Equipment** - Crash protectors, sumps, piping
 3. **Forecourt Submerged Pump Package** - Pumps, valves, manholes
-4. **Tank Equipment** - Fill pipes, vents, spill containers, monitoring
-5. **Tank Monitor - TLS-450** - Veeder Root TLS-450 system
-6. **Tank Monitor - TLS-350** - Veeder Root TLS-350 system  
-7. **Dispensers - Wayne Anthem** - Wayne dispenser equipment
-8. **Dispensers - Gilbarco** - Gilbarco dispenser equipment
-9. **Canopy Equipment** - Canopy structure and lighting
-10. **POS - Passport** - Complete point-of-sale system
-11. **Tank** - Tank-only package
-12. **Tank Monitor Package** - Generic monitor package
-
----
-
-## 📋 Default Todo Categories
-
-### General Project (32 todos)
-- Pre-construction planning
-- Environmental assessments
-- Permits and zoning
-- Site preparation
-- Staffing and training
-- Final approvals and launch
-
-### Equipment Packages (118 todos)
-- Installation checklists per package
-- Testing procedures
-- Inspection requirements
-- Documentation tasks
-- Compliance verification
+4. **Tank** - Tank-only package
+5. **Tank Equipment** - Fill pipes, vents, spill containers
+6. **Tank Monitor Package** - Generic monitoring equipment
+7. **Tank Monitor - TLS-450** - Veeder Root TLS-450 system
+8. **Tank Monitor - TLS-350** - Veeder Root TLS-350 system  
+9. **Dispensers - Wayne Anthem** - Wayne dispenser equipment
+10. **Dispensers - Gilbarco** - Gilbarco dispenser equipment
+11. **Canopy Equipment** - Canopy structure and lighting
+12. **POS - Passport** - Complete point-of-sale system
 
 ---
 
@@ -175,82 +173,52 @@ Tables auto-initialize on first run.
 - **Cost**: What YOU pay for the item
 - **Price**: What you CHARGE the client
 - Markup = Price - Cost
-- Always enter Cost first, then set Price
 
-### Priorities
-- **P1 (Red)**: Urgent/Critical - Regulatory, safety, inspections
-- **P2 (Orange)**: High Priority - Installation, commissioning
-- **P3 (Blue)**: Normal - Documentation, finishing touches
-- **P4**: Low priority - Nice-to-have items
+### Package Order
+- Reorder once on Equipment Packages page
+- Same order used for PDF generation
+- Order saves automatically
 
-### Edit Mode
-- Only one item editable at a time
-- Click ✏️ to edit
-- Click ✓ to save
-- ESC to cancel (future feature)
+### Contractor Logos
+- Upload once per contractor
+- Logo saved and reused across all projects
+- Appears on PDF under their assigned packages
 
-### Auto-Save
-- All changes save immediately
-- No "Save" button needed
-- Works across multiple tabs
-- Database backup every change
-
----
-
-## 🔧 Common Tasks
-
-### Add a New Equipment Package
-1. Go to Equipment Packages tab
-2. Click "+ Add Package"
-3. Select from dropdown or create custom
-4. Package appears in left sidebar
-
-### Add Line Items from Excel
-1. Create Python script with `openpyxl`
-2. Parse Excel file
-3. Map to equipment packages
-4. Insert into database
-5. See `parse-excel.py` for example
-
-### Customize Todo Lists
-1. Go to Todo List tab
-2. Click "+ Add Todo" under any section
-3. Enter task description
-4. Set priority and deadline
-5. Save - appears immediately
-
-### Export Data
-Currently manual via database queries.  
-Future: Export to Excel/PDF buttons.
+### Save as Default
+- Only saves for that specific package template
+- Includes qty, cost, and price
+- Button disappears when items match defaults
 
 ---
 
 ## 🐛 Troubleshooting
 
+### Modal Won't Close
+- Fixed in latest version
+- Clear browser cache if issue persists
+
 ### Items Not Saving
 - Check console for errors
 - Verify DATABASE_URL is set
 - Check network tab for API calls
-- Ensure PostgreSQL is accessible
 
-### Todos Not Showing
-- Check `section_todos` column format
-- Verify package names match exactly
-- Run `fix-section-todo-names.mjs` if needed
+### PDF Not Generating
+- Check for JavaScript errors
+- Ensure pdfMake library loaded
+- Try refreshing page
 
-### Price vs Cost Confusion
-- Cost = Your expense
-- Price = Client charge
-- Run `fix-pos-pricing.mjs` example if needed
+### Package Order Not Saving
+- Click "Apply Order" in reorder modal
+- Order saves to both page and PDF settings
 
 ---
 
 ## 📚 Documentation Files
 
 - `README.md` - Project overview and features
-- `PROJECT_STATUS.md` - Current status and roadmap
 - `QUICKSTART.md` - This file
 - `SESSION_SUMMARY_FEB_4_2026.md` - Detailed session notes
+- `CHANGES_FEB_4_2026.md` - Changes log
 - `TODO_ITEMS_PROPOSAL.md` - Default todo reference
 
 ---
@@ -260,14 +228,15 @@ Future: Export to Excel/PDF buttons.
 The application is live and ready to use. Start by:
 
 1. Opening the deployed site
-2. Viewing the default equipment packages
-3. Exploring the 150 pre-built todos
-4. Creating your first estimate!
+2. Creating a new project
+3. Adding equipment packages
+4. Uploading your company logo
+5. Generating your first PDF estimate!
 
-**Need more help?** Check `PROJECT_STATUS.md` for detailed feature documentation.
+**Need more help?** Check `README.md` for detailed feature documentation.
 
 ---
 
-**Version**: 2.0  
+**Version**: 3.0  
 **Status**: ✅ Production Ready  
-**Last Updated**: February 5, 2026
+**Last Updated**: February 7, 2026
