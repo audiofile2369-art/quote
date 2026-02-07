@@ -3277,6 +3277,8 @@ const app = {
             this.data.sectionUpcharges = job.section_upcharges || {};
             this.data.contractorPricing = job.contractor_pricing || {};
             this.data.contractorLineItems = job.contractor_line_items || {};
+            console.log('Loaded contractorPricing:', JSON.stringify(this.data.contractorPricing));
+            console.log('Loaded contractorLineItems:', JSON.stringify(this.data.contractorLineItems));
             this.data.todos = job.todos || [];
             this.data.sectionTodos = job.section_todos || {};
             this.data.contractorAssignments = job.contractor_assignments || {};
