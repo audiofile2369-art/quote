@@ -24,6 +24,9 @@ const app = {
         sectionDisclaimers: {}, // { 'package': 'disclaimer text' }
         contractorSectionDisclaimers: {}, // { 'package': { 'contractorName': 'disclaimer text' } }
         sectionUpcharges: {}, // { 'package': 15 } - percentage upcharge for cost -> price calculation
+        contractorPricing: {}, // { 'contractorName': { itemIndex: { cost: X, price: Y } } } - contractor's own pricing
+        contractorLineItems: {}, // { 'contractorName': { 'package': [{ description, qty, cost, price }] } } - contractor added items
+        showContractorPricing: false, // toggle to show/hide contractor pricing columns
         todos: [], // [{ id, text, priority, deadline, completed, completedAt }] - general todos
         sectionTodos: {}, // { 'package': [{ id, text, priority, deadline, completed, completedAt }] }
         contractorAssignments: {}, // { 'contractorName': ['Package A', 'Package B'] }
@@ -2226,6 +2229,167 @@ const app = {
     async updateSectionUpcharge(category, percent) {
         percent = parseFloat(percent) || 0;
 
+    // Toggle contractor pricing visibility
+    toggleContractorPricing() {
+        this.data.showContractorPricing = !this.data.showContractorPricing;
+        this.save();
+        this.renderItems();
+    },
+
+    // Update contractor's own pricing for an item
+    async updateContractorPricing(index, field, value) {
+        const contractorName = this.data.contractorName;
+        if (!contractorName) return;
+        
+        value = parseFloat(value) || 0;
+        
+        if (!this.data.contractorPricing) {
+            this.data.contractorPricing = {};
+        }
+        if (!this.data.contractorPricing[contractorName]) {
+            this.data.contractorPricing[contractorName] = {};
+        }
+        if (!this.data.contractorPricing[contractorName][index]) {
+            this.data.contractorPricing[contractorName][index] = { cost: 0, price: 0 };
+        }
+        
+        this.data.contractorPricing[contractorName][index][field] = value;
+        
+        this.save();
+        await this.saveToDatabase(true);
+        this.renderItems();
+        this.showNotification('✓ Your pricing saved');
+    },
+
+    // Add a new line item by contractor
+    addContractorLineItem(category) {
+        const contractorName = this.data.contractorName;
+        if (!contractorName) return;
+        
+        if (!this.data.contractorLineItems) {
+            this.data.contractorLineItems = {};
+        }
+        if (!this.data.contractorLineItems[contractorName]) {
+            this.data.contractorLineItems[contractorName] = {};
+        }
+        if (!this.data.contractorLineItems[contractorName][category]) {
+            this.data.contractorLineItems[contractorName][category] = [];
+        }
+        
+        this.data.contractorLineItems[contractorName][category].push({
+            description: '',
+            qty: 1,
+            cost: 0,
+            price: 0
+        });
+        
+        this.save();
+        this.renderItems();
+        
+        // Show modal to edit the new item
+        this.showContractorLineItemModal(category, this.data.contractorLineItems[contractorName][category].length - 1);
+    },
+
+    // Show modal to edit contractor line item
+    showContractorLineItemModal(category, itemIndex) {
+        const contractorName = this.data.contractorName;
+        const item = this.data.contractorLineItems?.[contractorName]?.[category]?.[itemIndex] || {};
+        
+        const modal = document.getElementById('modal');
+        const modalContent = document.getElementById('modalContent');
+        
+        modalContent.innerHTML = `
+            <h3>Add Your Line Item - ${category}</h3>
+            <p style="color: #666; margin-bottom: 15px; font-size: 14px;">Add a line item with your pricing for this package.</p>
+            
+            <div style="margin-bottom: 15px;">
+                <label style="display: block; font-weight: 600; margin-bottom: 5px;">Description:</label>
+                <input type="text" id="contractorItemDesc" value="${item.description || ''}" 
+                    style="width: 100%; padding: 10px; border: 1px solid #dee2e6; border-radius: 6px;" 
+                    placeholder="Enter item description">
+            </div>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; margin-bottom: 20px;">
+                <div>
+                    <label style="display: block; font-weight: 600; margin-bottom: 5px;">Quantity:</label>
+                    <input type="number" id="contractorItemQty" value="${item.qty || 1}" min="1" step="1"
+                        style="width: 100%; padding: 10px; border: 1px solid #dee2e6; border-radius: 6px;">
+                </div>
+                <div>
+                    <label style="display: block; font-weight: 600; margin-bottom: 5px;">Your Cost:</label>
+                    <input type="text" id="contractorItemCost" value="${item.cost ? '$' + this.formatCurrency(item.cost) : ''}"
+                        style="width: 100%; padding: 10px; border: 1px solid #dee2e6; border-radius: 6px;"
+                        placeholder="$0.00">
+                </div>
+                <div>
+                    <label style="display: block; font-weight: 600; margin-bottom: 5px;">Your Price:</label>
+                    <input type="text" id="contractorItemPrice" value="${item.price ? '$' + this.formatCurrency(item.price) : ''}"
+                        style="width: 100%; padding: 10px; border: 1px solid #dee2e6; border-radius: 6px;"
+                        placeholder="$0.00">
+                </div>
+            </div>
+            
+            <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                <button onclick="app.closeModal()" class="btn" style="background: #6c757d;">Cancel</button>
+                <button onclick="app.saveContractorLineItem('${category}', ${itemIndex})" class="btn" style="background: #22c55e;">Save Item</button>
+            </div>
+        `;
+        
+        modal.classList.add('show');
+    },
+
+    // Save contractor line item
+    async saveContractorLineItem(category, itemIndex) {
+        const contractorName = this.data.contractorName;
+        if (!contractorName) return;
+        
+        const desc = document.getElementById('contractorItemDesc').value.trim();
+        const qty = parseInt(document.getElementById('contractorItemQty').value) || 1;
+        const cost = this.parseCurrency(document.getElementById('contractorItemCost').value) || 0;
+        const price = this.parseCurrency(document.getElementById('contractorItemPrice').value) || 0;
+        
+        if (!desc) {
+            alert('Please enter a description');
+            return;
+        }
+        
+        if (!this.data.contractorLineItems[contractorName][category]) {
+            this.data.contractorLineItems[contractorName][category] = [];
+        }
+        
+        this.data.contractorLineItems[contractorName][category][itemIndex] = {
+            description: desc,
+            qty: qty,
+            cost: cost,
+            price: price
+        };
+        
+        this.closeModal();
+        this.save();
+        await this.saveToDatabase(true);
+        this.renderItems();
+        this.showNotification('✓ Line item added');
+    },
+
+    // Remove contractor line item
+    async removeContractorItem(category, itemIndex) {
+        const contractorName = this.data.contractorName;
+        if (!contractorName) return;
+        
+        if (!confirm('Remove this line item?')) return;
+        
+        if (this.data.contractorLineItems?.[contractorName]?.[category]) {
+            this.data.contractorLineItems[contractorName][category].splice(itemIndex, 1);
+            this.save();
+            await this.saveToDatabase(true);
+            this.renderItems();
+            this.showNotification('✓ Line item removed');
+        }
+    },
+
+    // Update upcharge percentage for a category and recalculate all prices
+    async updateSectionUpcharge(category, percent) {
+        percent = parseFloat(percent) || 0;
         if (!this.data.sectionUpcharges) {
             this.data.sectionUpcharges = {};
         }
@@ -2272,13 +2436,24 @@ const app = {
         // Owner mode: Select All checkbox bar and Add Package button
         if (this.data.mode !== 'contractor') {
             const selectAllBar = document.createElement('div');
-            selectAllBar.style.cssText = 'display:flex; align-items:center; gap:10px; padding:10px; background:#f8f9fa; border:1px solid #dee2e6; border-radius:6px; margin-bottom:10px;';
+            selectAllBar.style.cssText = 'display:flex; align-items:center; gap:10px; padding:10px; background:#f8f9fa; border:1px solid #dee2e6; border-radius:6px; margin-bottom:10px; flex-wrap: wrap;';
+            
+            // Check if any contractor pricing exists
+            const hasContractorPricing = Object.keys(this.data.contractorPricing || {}).length > 0 || 
+                                         Object.keys(this.data.contractorLineItems || {}).length > 0;
+            
             selectAllBar.innerHTML = `
                 <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
                     <input type="checkbox" id="selectAllSections" style="width:18px; height:18px;"> 
                     <span style="font-weight:600; color:#495057;">Select All Packages</span>
                 </label>
                 <div style="flex:1"></div>
+                ${hasContractorPricing ? `
+                <label style="display:flex; align-items:center; gap:8px; cursor:pointer; background: #e0f2fe; padding: 6px 12px; border-radius: 6px; border: 1px solid #0ea5e9;">
+                    <input type="checkbox" id="toggleContractorPricing" ${this.data.showContractorPricing ? 'checked' : ''} onchange="app.toggleContractorPricing()" style="width:16px; height:16px;"> 
+                    <span style="font-weight:500; color:#0369a1; font-size: 13px;">👷 Show Contractor Pricing</span>
+                </label>
+                ` : ''}
                 <button class="btn-add-section" style="background:#6c757d; margin-right:10px;" onclick="app.showReorderPackagesModal()">↕️ Reorder</button>
                 <button class="btn-add-section" style="background:#28a745; margin-right:10px;" onclick="app.showAddPackageModal()">➕ Add Equipment Package</button>
                 <button class="btn-add-section" style="background:#007bff;" onclick="app.sendSelectedSectionsToContractor()">📤 Send Selected to Contractor</button>`;
@@ -2402,21 +2577,76 @@ const app = {
             tableContainer.className = 'category-table';
 
             const table = document.createElement('table');
-            table.innerHTML = `
-                <thead>
-                    <tr>
-                        <th style="width: 35%;">Description</th>
-                        <th style="width: 80px;">QTY</th>
-                        <th style="width: 100px;">Cost</th>
-                        <th style="width: 100px;">Unit Price</th>
-                        <th style="width: 100px;">Total</th>
-                        <th style="width: 50px;"></th>
-                    </tr>
-                </thead>
-                <tbody></tbody>
-            `;
+            
+            // Determine if we should show contractor pricing columns
+            const isContractorMode = this.data.mode === 'contractor';
+            const isContractorSection = isContractorMode && this.data.contractorSections.includes(category);
+            const showContractorCols = !isContractorMode && this.data.showContractorPricing;
+            
+            // Get contractor name for this category
+            let assignedContractor = null;
+            if (this.data.contractorAssignments) {
+                for (const [contractor, packages] of Object.entries(this.data.contractorAssignments)) {
+                    if (packages.includes(category)) {
+                        assignedContractor = contractor;
+                        break;
+                    }
+                }
+            }
+            
+            if (isContractorMode && isContractorSection) {
+                // CONTRACTOR MODE: Show List Price (read-only) and Your Price (editable)
+                table.innerHTML = `
+                    <thead>
+                        <tr>
+                            <th style="width: 35%;">Description</th>
+                            <th style="width: 70px;">QTY</th>
+                            <th style="width: 100px;">List Price</th>
+                            <th style="width: 100px; background: #dbeafe;">Your Cost</th>
+                            <th style="width: 100px; background: #dbeafe;">Your Price</th>
+                            <th style="width: 100px; background: #dbeafe;">Your Total</th>
+                            <th style="width: 50px;"></th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                `;
+            } else if (showContractorCols && assignedContractor) {
+                // OWNER MODE WITH CONTRACTOR PRICING: Show both owner and contractor columns
+                table.innerHTML = `
+                    <thead>
+                        <tr>
+                            <th style="width: 25%;">Description</th>
+                            <th style="width: 60px;">QTY</th>
+                            <th style="width: 80px;">Cost</th>
+                            <th style="width: 80px;">Unit Price</th>
+                            <th style="width: 80px;">Total</th>
+                            <th style="width: 80px; background: #dbeafe;">👷 Cost</th>
+                            <th style="width: 80px; background: #dbeafe;">👷 Price</th>
+                            <th style="width: 80px; background: #dbeafe;">👷 Total</th>
+                            <th style="width: 50px;"></th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                `;
+            } else {
+                // STANDARD MODE
+                table.innerHTML = `
+                    <thead>
+                        <tr>
+                            <th style="width: 35%;">Description</th>
+                            <th style="width: 80px;">QTY</th>
+                            <th style="width: 100px;">Cost</th>
+                            <th style="width: 100px;">Unit Price</th>
+                            <th style="width: 100px;">Total</th>
+                            <th style="width: 50px;"></th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                `;
+            }
 
             const tbody = table.querySelector('tbody');
+            const contractorName = this.data.contractorName;
 
             categories[category].forEach(({ item, index }) => {
                 const row = document.createElement('tr');
@@ -2425,11 +2655,15 @@ const app = {
                 const total = (item.qty || 0) * price;
                 const escapedDesc = (item.description || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 
-                // In contractor mode, allow full editing within assigned sections; lock others
-                const isContractorSection = this.data.mode === 'contractor' && this.data.contractorSections.includes(category);
-                const readOnlyStyle = 'readonly style="background: #e9ecef; cursor: not-allowed;"';
+                // Get contractor pricing for this item
+                const contractorPricingData = this.data.contractorPricing?.[contractorName]?.[index] || 
+                                              this.data.contractorPricing?.[assignedContractor]?.[index] || {};
+                const cCost = contractorPricingData.cost || 0;
+                const cPrice = contractorPricingData.price || 0;
+                const cTotal = (item.qty || 0) * cPrice;
+
                 const canEdit = (this.data.mode !== 'contractor' || isContractorSection);
-                const removeBtn = canEdit ? `<button class="btn-remove" onclick="app.removeItem(${index})">×</button>` : '';
+                const removeBtn = canEdit && this.data.mode !== 'contractor' ? `<button class="btn-remove" onclick="app.removeItem(${index})">×</button>` : '';
 
                 // Check if this row is in edit mode
                 const isEditing = this.editingItemIndex === index;
@@ -2438,9 +2672,85 @@ const app = {
                 const formattedCost = this.formatCurrency(cost);
                 const formattedPrice = this.formatCurrency(price);
                 const formattedTotal = this.formatCurrency(total);
+                const formattedCCost = this.formatCurrency(cCost);
+                const formattedCPrice = this.formatCurrency(cPrice);
+                const formattedCTotal = this.formatCurrency(cTotal);
 
-                if (isEditing && canEdit) {
-                    // EDIT MODE: Show input fields
+                if (isContractorMode && isContractorSection) {
+                    // CONTRACTOR VIEW: Description read-only, List price read-only, own pricing editable
+                    row.innerHTML = `
+                        <td style="white-space: pre-wrap; word-wrap: break-word; padding: 10px;">${item.description || ''}</td>
+                        <td style="text-align: center;">${item.qty || 0}</td>
+                        <td style="text-align: right; color: #6b7280;">$${formattedPrice}</td>
+                        <td style="background: #eff6ff;">
+                            <input type="text" value="${cCost ? '$' + formattedCCost : ''}" 
+                                placeholder="$0.00"
+                                onfocus="this.value = app.parseCurrency(this.value) || ''"
+                                onblur="this.value = this.value ? app.formatCurrency(this.value) : ''; app.updateContractorPricing(${index}, 'cost', app.parseCurrency(this.value))"
+                                style="width: 100%; text-align: right; border: 1px solid #93c5fd; border-radius: 4px; padding: 4px 8px; background: white;">
+                        </td>
+                        <td style="background: #eff6ff;">
+                            <input type="text" value="${cPrice ? '$' + formattedCPrice : ''}"
+                                placeholder="$0.00"
+                                onfocus="this.value = app.parseCurrency(this.value) || ''"
+                                onblur="this.value = this.value ? app.formatCurrency(this.value) : ''; app.updateContractorPricing(${index}, 'price', app.parseCurrency(this.value))"
+                                style="width: 100%; text-align: right; border: 1px solid #93c5fd; border-radius: 4px; padding: 4px 8px; background: white;">
+                        </td>
+                        <td style="text-align: right; font-weight: 600; background: #eff6ff; color: #1d4ed8;">$${formattedCTotal}</td>
+                        <td></td>
+                    `;
+                } else if (showContractorCols && assignedContractor) {
+                    // OWNER VIEW WITH CONTRACTOR PRICING
+                    if (isEditing && canEdit) {
+                        // Edit mode with contractor columns
+                        const descInputId = `desc-input-${index}`;
+                        row.innerHTML = `
+                            <td style="position: relative;">
+                                <input type="text" id="${descInputId}" value="${escapedDesc}"
+                                    onchange="app.updateItem(${index}, 'description', this.value)"
+                                    oninput="app.showAutocomplete(this, ${index})"
+                                    onfocus="app.showAutocomplete(this, ${index})"
+                                    onblur="setTimeout(() => app.hideAutocomplete(${index}), 200)"
+                                    autocomplete="off">
+                                <div id="autocomplete-${index}" class="autocomplete-dropdown" style="display: none;"></div>
+                            </td>
+                            <td><input type="number" value="${item.qty || 0}" step="1" min="0" onchange="app.updateItem(${index}, 'qty', this.value)" style="width: 50px;"></td>
+                            <td><input type="text" value="${formattedCost}"
+                                onfocus="this.value = app.parseCurrency(this.value) || ''"
+                                onblur="this.value = app.formatCurrency(this.value); app.updateItemCost(${index}, '${category}', app.parseCurrency(this.value))"
+                                style="background: #fffbeb; text-align: right; width: 70px;"></td>
+                            <td><input type="text" value="${formattedPrice}"
+                                onfocus="this.value = app.parseCurrency(this.value) || ''"
+                                onblur="this.value = app.formatCurrency(this.value); app.updateItem(${index}, 'price', app.parseCurrency(this.value))"
+                                style="text-align: right; width: 70px;"></td>
+                            <td><input type="text" value="$${formattedTotal}" readonly style="text-align: right; width: 70px;"></td>
+                            <td style="text-align: right; background: #eff6ff; color: #1d4ed8;">$${formattedCCost}</td>
+                            <td style="text-align: right; background: #eff6ff; color: #1d4ed8;">$${formattedCPrice}</td>
+                            <td style="text-align: right; background: #eff6ff; color: #1d4ed8; font-weight: 600;">$${formattedCTotal}</td>
+                            <td style="white-space: nowrap;">
+                                <button onclick="app.saveItemEdit(${index})" style="background: #22c55e; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 14px; margin-right: 4px;" title="Save">✓</button>
+                                ${removeBtn}
+                            </td>
+                        `;
+                    } else {
+                        // View mode with contractor columns
+                        row.innerHTML = `
+                            <td style="white-space: pre-wrap; word-wrap: break-word; padding: 10px;">${item.description || ''}</td>
+                            <td style="text-align: center;">${item.qty || 0}</td>
+                            <td style="text-align: right; color: #6b7280;">$${formattedCost}</td>
+                            <td style="text-align: right;">$${formattedPrice}</td>
+                            <td style="text-align: right; font-weight: 600;">$${formattedTotal}</td>
+                            <td style="text-align: right; background: #eff6ff; color: #1d4ed8;">$${formattedCCost}</td>
+                            <td style="text-align: right; background: #eff6ff; color: #1d4ed8;">$${formattedCPrice}</td>
+                            <td style="text-align: right; background: #eff6ff; color: #1d4ed8; font-weight: 600;">$${formattedCTotal}</td>
+                            <td style="white-space: nowrap;">
+                                ${canEdit ? `<button onclick="app.editItemRow(${index})" style="background: #3b82f6; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 14px; margin-right: 4px;" title="Edit">✏️</button>` : ''}
+                                ${removeBtn}
+                            </td>
+                        `;
+                    }
+                } else if (isEditing && canEdit) {
+                    // STANDARD EDIT MODE
                     const descInputId = `desc-input-${index}`;
                     row.innerHTML = `
                         <td style="position: relative;">
@@ -2468,7 +2778,7 @@ const app = {
                         </td>
                     `;
                 } else {
-                    // VIEW MODE: Show text with wrapping, edit button
+                    // STANDARD VIEW MODE
                     row.innerHTML = `
                         <td style="white-space: pre-wrap; word-wrap: break-word; padding: 10px;">${item.description || ''}</td>
                         <td style="text-align: center;">${item.qty || 0}</td>
@@ -2483,6 +2793,56 @@ const app = {
                 }
                 tbody.appendChild(row);
             });
+            
+            // Add contractor's own line items if in contractor mode
+            if (isContractorMode && isContractorSection) {
+                const contractorItems = this.data.contractorLineItems?.[contractorName]?.[category] || [];
+                contractorItems.forEach((cItem, cIndex) => {
+                    const row = document.createElement('tr');
+                    row.style.background = '#f0fdf4'; // Light green to indicate contractor-added
+                    const cTotal = (cItem.qty || 0) * (cItem.price || 0);
+                    row.innerHTML = `
+                        <td style="white-space: pre-wrap; word-wrap: break-word; padding: 10px;">
+                            <span style="background: #22c55e; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px; margin-right: 8px;">NEW</span>
+                            ${cItem.description || ''}
+                        </td>
+                        <td style="text-align: center;">${cItem.qty || 0}</td>
+                        <td style="text-align: right; color: #6b7280;">—</td>
+                        <td style="text-align: right; background: #eff6ff; color: #1d4ed8;">$${this.formatCurrency(cItem.cost || 0)}</td>
+                        <td style="text-align: right; background: #eff6ff; color: #1d4ed8;">$${this.formatCurrency(cItem.price || 0)}</td>
+                        <td style="text-align: right; font-weight: 600; background: #eff6ff; color: #1d4ed8;">$${this.formatCurrency(cTotal)}</td>
+                        <td>
+                            <button class="btn-remove" onclick="app.removeContractorItem('${category}', ${cIndex})">×</button>
+                        </td>
+                    `;
+                    tbody.appendChild(row);
+                });
+            }
+            
+            // Show contractor line items in owner mode with contractor pricing toggle
+            if (showContractorCols && assignedContractor) {
+                const contractorItems = this.data.contractorLineItems?.[assignedContractor]?.[category] || [];
+                contractorItems.forEach((cItem, cIndex) => {
+                    const row = document.createElement('tr');
+                    row.style.background = '#f0fdf4';
+                    const cTotal = (cItem.qty || 0) * (cItem.price || 0);
+                    row.innerHTML = `
+                        <td style="white-space: pre-wrap; word-wrap: break-word; padding: 10px;">
+                            <span style="background: #22c55e; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px; margin-right: 8px;">👷 ADDED</span>
+                            ${cItem.description || ''}
+                        </td>
+                        <td style="text-align: center;">${cItem.qty || 0}</td>
+                        <td style="text-align: right; color: #9ca3af;">—</td>
+                        <td style="text-align: right; color: #9ca3af;">—</td>
+                        <td style="text-align: right; color: #9ca3af;">—</td>
+                        <td style="text-align: right; background: #eff6ff; color: #1d4ed8;">$${this.formatCurrency(cItem.cost || 0)}</td>
+                        <td style="text-align: right; background: #eff6ff; color: #1d4ed8;">$${this.formatCurrency(cItem.price || 0)}</td>
+                        <td style="text-align: right; font-weight: 600; background: #eff6ff; color: #1d4ed8;">$${this.formatCurrency(cTotal)}</td>
+                        <td></td>
+                    `;
+                    tbody.appendChild(row);
+                });
+            }
             
             tableContainer.appendChild(table);
             section.appendChild(tableContainer);
@@ -2512,12 +2872,21 @@ const app = {
             }
             section.appendChild(sectionTotalDiv);
             
-            // Add button for this category (only in owner mode or contractor's own sections)
-            if (this.data.mode !== 'contractor' || this.data.contractorSections.includes(category)) {
+            // Add button for this category
+            if (this.data.mode !== 'contractor') {
+                // Owner mode - regular add item button
                 const addBtn = document.createElement('button');
                 addBtn.className = 'btn-add-section';
                 addBtn.textContent = `+ Add Item to ${category}`;
                 addBtn.onclick = () => this.addItemToCategory(category);
+                section.appendChild(addBtn);
+            } else if (this.data.contractorSections.includes(category)) {
+                // Contractor mode - add THEIR OWN item button
+                const addBtn = document.createElement('button');
+                addBtn.className = 'btn-add-section';
+                addBtn.style.background = '#1d4ed8';
+                addBtn.textContent = `+ Add Your Line Item`;
+                addBtn.onclick = () => this.addContractorLineItem(category);
                 section.appendChild(addBtn);
             }
             
@@ -2921,6 +3290,8 @@ const app = {
             this.data.sectionDisclaimers = job.section_disclaimers || {};
             this.data.contractorSectionDisclaimers = job.contractor_section_disclaimers || {};
             this.data.sectionUpcharges = job.section_upcharges || {};
+            this.data.contractorPricing = job.contractor_pricing || {};
+            this.data.contractorLineItems = job.contractor_line_items || {};
             this.data.todos = job.todos || [];
             this.data.sectionTodos = job.section_todos || {};
             this.data.contractorAssignments = job.contractor_assignments || {};

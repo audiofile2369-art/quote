@@ -41,6 +41,8 @@ async function initDB() {
                 section_disclaimers JSONB DEFAULT '{}',
                 contractor_section_disclaimers JSONB DEFAULT '{}',
                 section_upcharges JSONB DEFAULT '{}',
+                contractor_pricing JSONB DEFAULT '{}',
+                contractor_line_items JSONB DEFAULT '{}',
                 contractor_assignments JSONB DEFAULT '{}',
                 todos JSONB DEFAULT '[]',
                 section_todos JSONB DEFAULT '{}',
@@ -81,6 +83,26 @@ async function initDB() {
             BEGIN
                 IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='jobs' AND column_name='section_upcharges') THEN
                     ALTER TABLE jobs ADD COLUMN section_upcharges JSONB DEFAULT '{}';
+                END IF;
+            END $$;
+        `);
+
+        // Add contractor_pricing column if it doesn't exist (for existing tables)
+        await client.query(`
+            DO $$
+            BEGIN
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='jobs' AND column_name='contractor_pricing') THEN
+                    ALTER TABLE jobs ADD COLUMN contractor_pricing JSONB DEFAULT '{}';
+                END IF;
+            END $$;
+        `);
+
+        // Add contractor_line_items column if it doesn't exist (for existing tables)
+        await client.query(`
+            DO $$
+            BEGIN
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='jobs' AND column_name='contractor_line_items') THEN
+                    ALTER TABLE jobs ADD COLUMN contractor_line_items JSONB DEFAULT '{}';
                 END IF;
             END $$;
         `);
@@ -505,9 +527,9 @@ app.post('/api/jobs', async (req, res) => {
                 station_name, client_name, site_address, quote_date, quote_number,
                 company_name, company_logo_url, contact_name, phone, email,
                 project_notes, tax_rate, discount, payment_terms,
-                scope_of_work, disclaimers, files, section_scopes, section_disclaimers, contractor_section_disclaimers, section_upcharges, contractor_assignments, contractor_logos, package_order,
+                scope_of_work, disclaimers, files, section_scopes, section_disclaimers, contractor_section_disclaimers, section_upcharges, contractor_pricing, contractor_line_items, contractor_assignments, contractor_logos, package_order,
                 todos, section_todos, meetings, section_meetings, critical_junctures, testing_calibration, testing_assignments, testing_schedules
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32)
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34)
             RETURNING id
         `, [
             req.body.stationName,
@@ -531,6 +553,8 @@ app.post('/api/jobs', async (req, res) => {
             JSON.stringify(req.body.sectionDisclaimers || {}),
             JSON.stringify(req.body.contractorSectionDisclaimers || {}),
             JSON.stringify(req.body.sectionUpcharges || {}),
+            JSON.stringify(req.body.contractorPricing || {}),
+            JSON.stringify(req.body.contractorLineItems || {}),
             JSON.stringify(req.body.contractorAssignments || {}),
             JSON.stringify(req.body.contractorLogos || {}),
             JSON.stringify(req.body.packageOrder || []),
@@ -620,9 +644,9 @@ app.put('/api/jobs/:id', async (req, res) => {
                 company_name = $6, company_logo_url = $7, contact_name = $8, phone = $9, email = $10,
                 project_notes = $11, tax_rate = $12, discount = $13, payment_terms = $14,
                 scope_of_work = $15, disclaimers = $16, files = $17,
-                section_scopes = $18, section_disclaimers = $19, contractor_section_disclaimers = $20, section_upcharges = $21, contractor_assignments = $22, contractor_logos = $23, package_order = $24,
-                todos = $25, section_todos = $26, meetings = $27, section_meetings = $28, critical_junctures = $29, testing_calibration = $30, testing_assignments = $31, testing_schedules = $32, updated_at = NOW()
-            WHERE id = $33
+                section_scopes = $18, section_disclaimers = $19, contractor_section_disclaimers = $20, section_upcharges = $21, contractor_pricing = $22, contractor_line_items = $23, contractor_assignments = $24, contractor_logos = $25, package_order = $26,
+                todos = $27, section_todos = $28, meetings = $29, section_meetings = $30, critical_junctures = $31, testing_calibration = $32, testing_assignments = $33, testing_schedules = $34, updated_at = NOW()
+            WHERE id = $35
         `, [
             req.body.stationName,
             req.body.clientName,
@@ -645,6 +669,8 @@ app.put('/api/jobs/:id', async (req, res) => {
             JSON.stringify(req.body.sectionDisclaimers || {}),
             JSON.stringify(req.body.contractorSectionDisclaimers || {}),
             JSON.stringify(req.body.sectionUpcharges || {}),
+            JSON.stringify(req.body.contractorPricing || {}),
+            JSON.stringify(req.body.contractorLineItems || {}),
             JSON.stringify(req.body.contractorAssignments || {}),
             JSON.stringify(req.body.contractorLogos || {}),
             JSON.stringify(req.body.packageOrder || []),
